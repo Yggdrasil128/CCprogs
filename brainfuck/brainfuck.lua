@@ -260,6 +260,6 @@ end
 
 main()
 
-x,y = termgetSize()
+x,y = term.getCursorPos()
 
 if x > 1 then print("") end
