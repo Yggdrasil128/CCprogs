@@ -2,7 +2,7 @@
 -- by Yggdrasil128
 version = "1.2.2"
 
--- See 'http://irgendwas.ka/idk'
+-- See 'https://github.com/Yggdrasil128/CCprogs/tree/master/brainfuck'
 -- for more information
 
 
