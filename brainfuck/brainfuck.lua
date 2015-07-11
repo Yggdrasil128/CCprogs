@@ -1,6 +1,6 @@
 -- ComputerCraft Brainfuck Interpreter
 -- by Yggdrasil128
-version = "1.2.3"
+version = "1.2.4"
 
 -- See 'https://github.com/Yggdrasil128/CCprogs/tree/master/brainfuck'
 -- for more information
@@ -9,20 +9,20 @@ version = "1.2.3"
 -- begin of user defined settings
 cfg = {}
 
--- number of elements in the stack
-cfg.stackSize = 256
+-- number of cells
+cfg.cellCount = 256
 
--- width of every stack element in bit
-cfg.stackWidth = 8
+-- width of every cell in bit
+cfg.cellWidth = 8
 
 -- output data as ascii char?
--- stackWidth has to be set to 8 to allow this
+-- cellWidth has to be set to 8 to allow this
 cfg.asciiOut = true
 
--- allow stack element value overflow/underflow?
+-- allow cell value overflow/underflow?
 cfg.stackElementOverflow = false
 
--- allow stack index overflow/underflow?
+-- allow cell index overflow/underflow?
 cfg.stackIndexOverflow = false
 
 -- do fuel checks?
@@ -39,7 +39,7 @@ print("Computercraft Brainfuck Interpreter v"..version)
 print("by Yggdrasil128")
 print("")
 
-if cfg.stackWidth ~= 8 then cfg.asciiOut = false end
+if cfg.cellWidth ~= 8 then cfg.asciiOut = false end
 
 id = {}
 id.wool = "minecraft:wool"
@@ -79,8 +79,8 @@ function setLoop(startDir)
   return false
 end
 
-stack = {}
-for i=1,cfg.stackSize do stack[i] = 0 end
+cells = {}
+for i=1,cfg.cellCount do cells[i] = 0 end
 index = 1
 
 loopWidth = 0
@@ -88,16 +88,16 @@ loopWidth = 0
 stopped = false
 
 function doInc()
-  stack[index] = stack[index] + 1
-  if (stack[index] == math.pow(2,cfg.stackWidth)) then
-    if cfg.stackElementOverflow
-    then stack[index] = 0
+  cells[index] = cells[index] + 1
+  if (cells[index] == math.pow(2,cfg.cellWidth)) then
+    if cfg.cellsElementOverflow
+    then cells[index] = 0
     else
       if term.isColor()
       then term.setTextColor(colors.red) end
       print("")
-      print("Stack element overflow at index "..index.."!")
-      print("Set cfg.stackElementOverflow to true")
+      print("cells element overflow at index "..index.."!")
+      print("Set cfg.cellsElementOverflow to true")
       print("to disable this error.")
       print("")
       error("program canceled")
@@ -106,16 +106,16 @@ function doInc()
 end
 
 function doDec()
-  stack[index] = stack[index] - 1
-  if (stack[index] == -1) then
-    if cfg.stackElementOverflow
-    then stack[index] = math.pow(2,cfg.stackWidth) - 1
+  cells[index] = cells[index] - 1
+  if (cells[index] == -1) then
+    if cfg.cellsElementOverflow
+    then cells[index] = math.pow(2,cfg.cellWidth) - 1
     else
       if term.isColor()
       then term.setTextColor(colors.red) end
       print("")
-      print("Stack element underflow at index "..index.."!")
-      print("Set cfg.stackElementOverflow to true")
+      print("cells element underflow at index "..index.."!")
+      print("Set cfg.cellsElementOverflow to true")
       print("to disable this error.")
       print("")
       error("program canceled")
@@ -124,12 +124,12 @@ function doDec()
 end
 
 function doIncIndex()
-  if index == cfg.stackSize then
-    if cfg.stackIndexOverflow then index = 1 else
+  if index == cfg.cellCount then
+    if cfg.cellsIndexOverflow then index = 1 else
       if term.isColor() then term.setTextColor(colors.red) end
       print("")
-      print("Stack index overflow!")
-      print("Set cfg.stackIndexOverflow to true")
+      print("cells index overflow!")
+      print("Set cfg.cellsIndexOverflow to true")
       print("to disable this error")
       print("")
       error("program canceled")
@@ -139,11 +139,11 @@ end
 
 function doDecIndex()
   if index == 1 then
-    if cfg.stackIndexOverflow then index = cfg.stackSize else
+    if cfg.cellsIndexOverflow then index = cfg.cellCount else
       if term.isColor() then term.setTextColor(colors.red) end
       print("")
-      print("Stack index underflow!")
-      print("Set cfg.stackIndexOverflow to true")
+      print("cells index underflow!")
+      print("Set cfg.cellsIndexOverflow to true")
       print("to disable this error")
       print("")
       error("program canceled")
@@ -167,7 +167,7 @@ function doLoopEnd()
     print("")
     error("program canceled")
   end
-  if stack[index] ~= 0 then
+  if cells[index] ~= 0 then
     local l = 0
     while l >= 0 do
       while not turtle.back() do sleep(0.05) end
@@ -184,11 +184,11 @@ end
 
 function doWrite()
   if cfg.asciiOut then
-    write(string.char(stack[index]))
+    write(string.char(cells[index]))
   else
     local x,y = term.getCursorPos()
     if x > 1 then write(",") end
-    write(tostring(stack[index]))
+    write(tostring(cells[index]))
   end
 end
 
@@ -197,21 +197,27 @@ function doRead()
   if x > 1 then print("") end
   write("input: ")
   local input = read()
-  if input:sub(1,1) == ":" then
+  if (input:sub(1,1) == ":") and (#input > 1) then
     local int = tonumber(input:sub(2))
     if int == nil then
       print("Invalid input, try again:")
       doRead()
-    elseif int >= math.pow(2,cfg.stackWidth) then
+    elseif int >= math.pow(2,cfg.cellWidth) then
       print("Input too big, try again:")
       doRead()
-    else stack[index] = int end
+    elseif int < 0 then
+      print("No negative numbers allowed, try again:")
+      doRead()
+    else cells[index] = int end
   else
     local int = input:byte()
     if int == nil then
       print("Invalid input, try again:")
       doRead()
-    else stack[index] = int end
+    elseif int >= math.pow(2,cfg.cellWidth) then
+      print("Input too big, try again:")
+      doRead()
+    else cells[index] = int end
   end
 end
 
