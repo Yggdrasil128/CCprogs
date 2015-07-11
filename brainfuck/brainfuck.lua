@@ -1,11 +1,11 @@
--- ComputerCraft Brainfuck Interpreter
+-- CC Brainfuck
 -- by Yggdrasil128
-version = "1.2.4"
+version = "1.2.5"
 
 -- See 'https://github.com/Yggdrasil128/CCprogs/tree/master/brainfuck'
 -- for more information
 
-
+-- ######################################
 -- begin of user defined settings
 cfg = {}
 
@@ -20,10 +20,10 @@ cfg.cellWidth = 8
 cfg.asciiOut = true
 
 -- allow cell value overflow/underflow?
-cfg.stackElementOverflow = false
+cfg.cellValueOverflow = false
 
 -- allow cell index overflow/underflow?
-cfg.stackIndexOverflow = false
+cfg.cellIndexOverflow = false
 
 -- do fuel checks?
 -- disable this if you have disabled fuel usage
@@ -31,13 +31,79 @@ cfg.stackIndexOverflow = false
 cfg.fuelCheck = true
 
 -- end of user defined settings
-
+-- ######################################
 
 -- begin of program code
 
-print("Computercraft Brainfuck Interpreter v"..version)
+print("CC Brainfuck v"..version)
 print("by Yggdrasil128")
 print("")
+
+if type(cfg.cellCount) ~= "number" then
+  if term.isColor() then term.setTextColor(colors.red) end
+  print("Config error!")
+  print("Invalid value for cfg.cellCount:")
+  print("Expected number, but got"..type(cfg.cellCount))
+  print("")
+  error("program canceled")
+elseif cfg.cellCount < 1 then
+  print("Config error!")
+  print("Invalid value for cfg.cellCount:")
+  print("Value must be at least 1, but got"..tostring(cfg.cellCount))
+  print("")
+  error("program canceled")
+else cfg.cellCount = math.floor(cfg.cellCount) end
+
+if type(cfg.cellWidth) ~= "number" then
+  if term.isColor() then term.setTextColor(colors.red) end
+  print("Config error!")
+  print("Invalid value for cfg.cellWidth:")
+  print("Expected number, but got"..type(cfg.cellWidth))
+  print("")
+  error("program canceled")
+elseif cfg.cellWidth < 1 then
+  print("Config error!")
+  print("Invalid value for cfg.cellWidth:")
+  print("Value must be at least 1, but got"..tostring(cfg.cellWidth))
+  print("")
+  error("program canceled")
+else cfg.cellWidth = math.floor(cfg.cellWidth) end
+
+if type(cfg.asciiOut) ~= "boolean" then
+  if term.isColor() then term.setTextColor(colors.red) end
+  print("Config error!")
+  print("Invalid value for cfg.asciiOut:")
+  print("Expected boolean, but got"..type(cfg.asciiOut))
+  print("")
+  error("program canceled")
+end
+
+if type(cfg.cellValueOverflow) ~= "boolean" then
+  if term.isColor() then term.setTextColor(colors.red) end
+  print("Config error!")
+  print("Invalid value for cfg.cellValueOverflow:")
+  print("Expected boolean, but got"..type(cfg.cellValueOverflow))
+  print("")
+  error("program canceled")
+end
+
+if type(cfg.cellIndexOverflow) ~= "boolean" then
+  if term.isColor() then term.setTextColor(colors.red) end
+  print("Config error!")
+  print("Invalid value for cfg.cellIndexOverflow:")
+  print("Expected boolean, but got"..type(cfg.cellIndexOverflow))
+  print("")
+  error("program canceled")
+end
+
+if type(cfg.fuelCheck) ~= "boolean" then
+  if term.isColor() then term.setTextColor(colors.red) end
+  print("Config error!")
+  print("Invalid value for cfg.fuelCheck:")
+  print("Expected boolean, but got"..type(cfg.fuelCheck))
+  print("")
+  error("program canceled")
+end
 
 if cfg.cellWidth ~= 8 then cfg.asciiOut = false end
 
@@ -90,14 +156,14 @@ stopped = false
 function doInc()
   cells[index] = cells[index] + 1
   if (cells[index] == math.pow(2,cfg.cellWidth)) then
-    if cfg.cellsElementOverflow
+    if cfg.cellValueOverflow
     then cells[index] = 0
     else
       if term.isColor()
       then term.setTextColor(colors.red) end
       print("")
       print("cells element overflow at index "..index.."!")
-      print("Set cfg.cellsElementOverflow to true")
+      print("Set cfg.cellValueOverflow to true")
       print("to disable this error.")
       print("")
       error("program canceled")
@@ -108,14 +174,14 @@ end
 function doDec()
   cells[index] = cells[index] - 1
   if (cells[index] == -1) then
-    if cfg.cellsElementOverflow
+    if cfg.cellValueOverflow
     then cells[index] = math.pow(2,cfg.cellWidth) - 1
     else
       if term.isColor()
       then term.setTextColor(colors.red) end
       print("")
       print("cells element underflow at index "..index.."!")
-      print("Set cfg.cellsElementOverflow to true")
+      print("Set cfg.cellValueOverflow to true")
       print("to disable this error.")
       print("")
       error("program canceled")
@@ -125,11 +191,11 @@ end
 
 function doIncIndex()
   if index == cfg.cellCount then
-    if cfg.cellsIndexOverflow then index = 1 else
+    if cfg.cellIndexOverflow then index = 1 else
       if term.isColor() then term.setTextColor(colors.red) end
       print("")
       print("cells index overflow!")
-      print("Set cfg.cellsIndexOverflow to true")
+      print("Set cfg.cellIndexOverflow to true")
       print("to disable this error")
       print("")
       error("program canceled")
@@ -139,11 +205,11 @@ end
 
 function doDecIndex()
   if index == 1 then
-    if cfg.cellsIndexOverflow then index = cfg.cellCount else
+    if cfg.cellIndexOverflow then index = cfg.cellCount else
       if term.isColor() then term.setTextColor(colors.red) end
       print("")
       print("cells index underflow!")
-      print("Set cfg.cellsIndexOverflow to true")
+      print("Set cfg.cellIndexOverflow to true")
       print("to disable this error")
       print("")
       error("program canceled")
