@@ -1,4 +1,4 @@
-# ComputerCraft Brainfuck Interpreter
+# CC Brainfuck
 by Yggdrasil128
 
 Download v1.3 for ComputerCraft 1.64 or later:  
