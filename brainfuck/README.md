@@ -1,7 +1,7 @@
 # ComputerCraft Brainfuck Interpreter 
 by Yggdrasil128
 
-Download v1.2.2:
-`pastebin get X9svzgUy brainfuck`
+Download v1.2.3:
+`pastebin get MJeXt6if brainfuck`
 
 Wiki: https://github.com/Yggdrasil128/CCprogs/wiki/Brainfuck
