@@ -1,6 +1,6 @@
 -- ComputerCraft Brainfuck Interpreter
 -- by Yggdrasil128
-version = "1.2.2"
+version = "1.2.3"
 
 -- See 'https://github.com/Yggdrasil128/CCprogs/tree/master/brainfuck'
 -- for more information
@@ -86,8 +86,6 @@ index = 1
 loopWidth = 0
 
 stopped = false
-
-firstWrite = true
 
 function doInc()
   stack[index] = stack[index] + 1
@@ -188,7 +186,8 @@ function doWrite()
   if cfg.asciiOut then
     write(string.char(stack[index]))
   else
-    if not firstWrite then write(",") end
+    local x,y = term.getCursorPos()
+    if x > 1 then write(",") end
     write(tostring(stack[index]))
   end
 end
@@ -221,7 +220,7 @@ function doStop()
 end
 
 function doIt()
-  b,fp = turtle.inspectDown()
+  local b,fp = turtle.inspectDown()
   if b then
     if fp.name == id.wool then
       if fp.metadata == id.inc then doInc()
@@ -260,3 +259,7 @@ function main()
 end
 
 main()
+
+x,y = termgetSize()
+
+if x > 1 then print("") end
