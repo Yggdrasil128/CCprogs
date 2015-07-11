@@ -1,6 +1,7 @@
 # ComputerCraft Brainfuck Interpreter
 by Yggdrasil128
 
-Download v1.2.5: `pastebin get g2uM7zA0 bf`
+Download v1.3 for ComputerCraft 1.64 or later:  
+`pastebin get nDqyTv9c bf`
 
 Wiki: https://github.com/Yggdrasil128/CCprogs/wiki/Brainfuck

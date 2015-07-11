@@ -1,6 +1,6 @@
 -- CC Brainfuck
 -- by Yggdrasil128
-version = "1.2.5"
+version = "1.3"
 
 -- See 'https://github.com/Yggdrasil128/CCprogs/tree/master/brainfuck'
 -- for more information
@@ -35,21 +35,39 @@ cfg.fuelCheck = true
 
 -- begin of program code
 
+local args = { ... }
+
 print("CC Brainfuck v"..version)
 print("by Yggdrasil128")
 print("")
+
+function getOSVersionFloat()
+  local s = os.version()
+  return tonumber(s:sub(9))
+end
+
+if getOSVersionFloat() < 1.64 then
+  if term.isColor() then term.setTextColor(colors.red) end
+  print("ComputerCraft out of date!")
+  print("")
+  print("To run CC Brainfuck")
+  print("CraftOS 1.64 or higher is needed.")
+  print("You are running "..os.version())
+  print("")
+  error("program canceled")
+end
 
 if type(cfg.cellCount) ~= "number" then
   if term.isColor() then term.setTextColor(colors.red) end
   print("Config error!")
   print("Invalid value for cfg.cellCount:")
-  print("Expected number, but got"..type(cfg.cellCount))
+  print("Expected number, but got "..type(cfg.cellCount))
   print("")
   error("program canceled")
 elseif cfg.cellCount < 1 then
   print("Config error!")
   print("Invalid value for cfg.cellCount:")
-  print("Value must be at least 1, but got"..tostring(cfg.cellCount))
+  print("Value must be at least 1, but got "..tostring(cfg.cellCount))
   print("")
   error("program canceled")
 else cfg.cellCount = math.floor(cfg.cellCount) end
@@ -58,13 +76,13 @@ if type(cfg.cellWidth) ~= "number" then
   if term.isColor() then term.setTextColor(colors.red) end
   print("Config error!")
   print("Invalid value for cfg.cellWidth:")
-  print("Expected number, but got"..type(cfg.cellWidth))
+  print("Expected number, but got "..type(cfg.cellWidth))
   print("")
   error("program canceled")
 elseif cfg.cellWidth < 1 then
   print("Config error!")
   print("Invalid value for cfg.cellWidth:")
-  print("Value must be at least 1, but got"..tostring(cfg.cellWidth))
+  print("Value must be at least 1, but got "..tostring(cfg.cellWidth))
   print("")
   error("program canceled")
 else cfg.cellWidth = math.floor(cfg.cellWidth) end
@@ -73,7 +91,7 @@ if type(cfg.asciiOut) ~= "boolean" then
   if term.isColor() then term.setTextColor(colors.red) end
   print("Config error!")
   print("Invalid value for cfg.asciiOut:")
-  print("Expected boolean, but got"..type(cfg.asciiOut))
+  print("Expected boolean, but got "..type(cfg.asciiOut))
   print("")
   error("program canceled")
 end
@@ -82,7 +100,7 @@ if type(cfg.cellValueOverflow) ~= "boolean" then
   if term.isColor() then term.setTextColor(colors.red) end
   print("Config error!")
   print("Invalid value for cfg.cellValueOverflow:")
-  print("Expected boolean, but got"..type(cfg.cellValueOverflow))
+  print("Expected boolean, but got "..type(cfg.cellValueOverflow))
   print("")
   error("program canceled")
 end
@@ -91,7 +109,7 @@ if type(cfg.cellIndexOverflow) ~= "boolean" then
   if term.isColor() then term.setTextColor(colors.red) end
   print("Config error!")
   print("Invalid value for cfg.cellIndexOverflow:")
-  print("Expected boolean, but got"..type(cfg.cellIndexOverflow))
+  print("Expected boolean, but got "..type(cfg.cellIndexOverflow))
   print("")
   error("program canceled")
 end
@@ -100,7 +118,7 @@ if type(cfg.fuelCheck) ~= "boolean" then
   if term.isColor() then term.setTextColor(colors.red) end
   print("Config error!")
   print("Invalid value for cfg.fuelCheck:")
-  print("Expected boolean, but got"..type(cfg.fuelCheck))
+  print("Expected boolean, but got "..type(cfg.fuelCheck))
   print("")
   error("program canceled")
 end
@@ -252,15 +270,13 @@ function doWrite()
   if cfg.asciiOut then
     write(string.char(cells[index]))
   else
-    local x,y = term.getCursorPos()
-    if x > 1 then write(",") end
+    if term.getCursorPos() > 1 then write(",") end
     write(tostring(cells[index]))
   end
 end
 
 function doRead()
-  local x,y = term.getCursorPos()
-  if x > 1 then print("") end
+  if term.getCursorPos() > 1 then print("") end
   write("input: ")
   local input = read()
   if (input:sub(1,1) == ":") and (#input > 1) then
@@ -309,16 +325,17 @@ function doIt()
   end
 end
 
-function main()
+function bf_standalone()
+  local fuel = 0
   if cfg.fuelCheck then
-    local fuel = turtle.getFuelLevel()
+    fuel = turtle.getFuelLevel()
     print("Starting with "..fuel.." fuel.")
     print("")
   end
   doIt()
   while not stopped do
     if cfg.fuelCheck then while fuel == 0 do
-      print("")
+      if term.getCursorPos() > 1 then print("") end
       print("Turtle out of fuel.")
       write("Please put some fuel into the active slot, then press enter.")
       read()
@@ -330,8 +347,39 @@ function main()
   end
 end
 
+function sub_return()
+  print("Returning to program start...")
+  turtle.turnRight()
+  turtle.turnRight()
+  while not turtle.detect() do turtle.forward() end
+  turtle.turnRight()
+  turtle.turnRight()
+end
+
+function sub_refuel()
+  print("Refueling turtle...")
+  local old = turtle.getSelectedSlot()
+  local i = 1
+  while (i <= 16) and (turtle.getFuelLevel() < turtle.getFuelLimit()) do
+    turtle.select(i)
+    turtle.refuel()
+  end
+  turtle.select(old)
+  print("Turtle now has "..turtle.getFuelLevel().." fuel.")
+end
+
+function main()
+  if type(args[1]) == "nil" then bf_standalone()
+  elseif args[1] == "return" then sub_return()
+  elseif args[1] == "refuel" then sub_refuel()
+  elseif args[1] == "42" then print("The answer to life, the universe and everything")
+  else
+    if term.isColor() then term.setTextColor(colors.red) end
+    print("Invalid program parameter!")
+    print("See the wiki at GitHub for more information.")
+    print("A link to the GitHub page is at the beginning of this program's file.")
+  end
+  if term.getCursorPos() > 1 then print("") end
+end
+
 main()
-
-x,y = term.getCursorPos()
-
-if x > 1 then print("") end
