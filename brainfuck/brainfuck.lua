@@ -1,6 +1,6 @@
 -- CC Brainfuck
 -- by Yggdrasil128
-version = "1.3"
+version = "1.3.1"
 
 -- See 'https://github.com/Yggdrasil128/CCprogs/tree/master/brainfuck'
 -- for more information
@@ -167,7 +167,7 @@ cells = {}
 for i=1,cfg.cellCount do cells[i] = 0 end
 index = 1
 
-loopWidth = 0
+loopDepth = 0
 
 stopped = false
 
@@ -180,7 +180,7 @@ function doInc()
       if term.isColor()
       then term.setTextColor(colors.red) end
       print("")
-      print("cells element overflow at index "..index.."!")
+      print("Cell value overflow at index "..index.."!")
       print("Set cfg.cellValueOverflow to true")
       print("to disable this error.")
       print("")
@@ -198,7 +198,7 @@ function doDec()
       if term.isColor()
       then term.setTextColor(colors.red) end
       print("")
-      print("cells element underflow at index "..index.."!")
+      print("Cell value underflow at index "..index.."!")
       print("Set cfg.cellValueOverflow to true")
       print("to disable this error.")
       print("")
@@ -212,7 +212,7 @@ function doIncIndex()
     if cfg.cellIndexOverflow then index = 1 else
       if term.isColor() then term.setTextColor(colors.red) end
       print("")
-      print("cells index overflow!")
+      print("Cell index overflow!")
       print("Set cfg.cellIndexOverflow to true")
       print("to disable this error")
       print("")
@@ -226,7 +226,7 @@ function doDecIndex()
     if cfg.cellIndexOverflow then index = cfg.cellCount else
       if term.isColor() then term.setTextColor(colors.red) end
       print("")
-      print("cells index underflow!")
+      print("Cell index underflow!")
       print("Set cfg.cellIndexOverflow to true")
       print("to disable this error")
       print("")
@@ -239,12 +239,12 @@ function doLoopStart()
   if not id.loopSet then
     local b,fp = turtle.inspectDown()
     id.loopSet = setLoop(fp.metadata)
-    if id.loopSet then loopWidth = loopWidth + 1 end
-  else loopWidth = loopWidth + 1 end
+    if id.loopSet then loopDepth = loopDepth + 1 end
+  else loopDepth = loopDepth + 1 end
 end
 
 function doLoopEnd()
-  if loopWidth == 0 then
+  if loopDepth == 0 then
     if term.isColor() then term.setTextColor(colors.red) end
     print("")
     print("Syntax error: unexpected loop end!")
@@ -263,7 +263,7 @@ function doLoopEnd()
         end
       end
     end
-  else loopWidth = loopWidth - 1 end
+  else loopDepth = loopDepth - 1 end
 end
 
 function doWrite()
