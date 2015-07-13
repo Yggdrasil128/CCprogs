@@ -1,11 +1,28 @@
--- CC Brainfuck
--- by Yggdrasil128
-version = "1.3.1"
+version = "1.3.2"
+--[[
+CC Brainfuck by Yggdrasil128
 
--- See 'https://github.com/Yggdrasil128/CCprogs/tree/master/brainfuck'
--- for more information
+See 'https://github.com/Yggdrasil128/CCprogs/tree/master/brainfuck'
+for more information
 
--- ######################################
+Copyright (C) 2015  Tim Taubitz (Yggdrasil128)
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with this program; if not, write to the Free Software Foundation, Inc.,
+51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+]]
+
+-----------------------------------------
 -- begin of user defined settings
 cfg = {}
 
@@ -15,8 +32,7 @@ cfg.cellCount = 256
 -- width of every cell in bit
 cfg.cellWidth = 8
 
--- output data as ascii char?
--- cellWidth has to be set to 8 to allow this
+-- output cell values as ASCII char?
 cfg.asciiOut = true
 
 -- allow cell value overflow/underflow?
@@ -31,15 +47,28 @@ cfg.cellIndexOverflow = false
 cfg.fuelCheck = true
 
 -- end of user defined settings
--- ######################################
+-----------------------------------------
 
 -- begin of program code
 
 local args = { ... }
 
-print("CC Brainfuck v"..version)
-print("by Yggdrasil128")
-print("")
+if term.isColor() then
+  term.setTextColor(colors.orange)
+  write("CC Brainfuck ")
+    term.setTextColor(colors.lightGray)
+  print("v"..version)
+  term.setTextColor(colors.gray)
+  print("Copyright (c) 2015")
+  print("Tim Taubitz (Yggdrasil128)")
+  print("")
+  term.setTextColor(colors.white)
+else
+  print("CC Brainfuck v"..version)
+  print("Copyright (c) 2015")
+  print("Tim Taubitz (Yggdrasil128)")
+  print("")
+end
 
 function getOSVersionFloat()
   local s = os.version()
@@ -122,8 +151,6 @@ if type(cfg.fuelCheck) ~= "boolean" then
   print("")
   error("program canceled")
 end
-
-if cfg.cellWidth ~= 8 then cfg.asciiOut = false end
 
 id = {}
 id.wool = "minecraft:wool"
@@ -268,7 +295,7 @@ end
 
 function doWrite()
   if cfg.asciiOut then
-    write(string.char(cells[index]))
+    write(string.char(cells[index]%256))
   else
     if term.getCursorPos() > 1 then write(",") end
     write(tostring(cells[index]))
