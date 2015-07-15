@@ -2,5 +2,5 @@
 
 ## This project is currently in development
 
-### Current status:  
-Building up the core
+### Project status:  
+In development, no working build available yet
