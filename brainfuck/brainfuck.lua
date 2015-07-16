@@ -1,4 +1,4 @@
-version = "1.3.2"
+version = "1.3.3"
 --[[
 CC Brainfuck by Yggdrasil128
 
@@ -390,6 +390,7 @@ function sub_refuel()
   while (i <= 16) and (turtle.getFuelLevel() < turtle.getFuelLimit()) do
     turtle.select(i)
     turtle.refuel()
+    i = i + 1
   end
   turtle.select(old)
   print("Turtle now has "..turtle.getFuelLevel().." fuel.")
