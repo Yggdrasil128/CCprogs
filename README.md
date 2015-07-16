@@ -1,2 +1,5 @@
 # CCprogs
-Small LUA programs for ComputerCraft
+## by Yggdrasil128
+
+Free to use LUA programs for ComputerCraft.  
+Have fun!
