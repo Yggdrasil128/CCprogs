@@ -173,7 +173,63 @@ function welcomeScreen()
       os.sleep(0.05)
     end
   end
-  t.c()
+end
+
+updateStatus = nil
+update = nil
+function checkForUpdate()
+  if http == nil then return nil end
+  local pastebinURL = "http://pastebin.com/raw/"
+  local updateURL = "https://rawgit.com/Yggdrasil128/CCprogs/stripmine2wip/stripmine/versiontracker"
+  if not http.checkURL(updateURL) then return nil end
+  local get = http.get(updateURL)
+  if get == nil then return nil end
+  update = textutils.unserialize(get.readAll())
+  get.close()
+  if type(update) ~= "table" then return nil end
+  if type(update.version) ~= "string" then return nil end
+  if type(update.pastebinID) ~= "string" then return nil end
+  if not http.checkURL(pastebinURL..update.pastebinID) then return nil end
+
+  function parseVersion(s)
+    r = {}
+    r[1] = 0
+    p = 1
+    for i=1,#s,1 do
+      local c = s:sub(i,i)
+      if c == " " then break
+      elseif c == "." then
+        p = p +1
+        r[p] = 0
+      elseif type(tonumber(c)) == "number" then
+        r[p] = 10*r[p] + tonumber(c)
+      end
+    end
+    return r
+  end
+
+  function isNewer(v)
+    local v0 = parseVersion(version)
+    if #v ~= #v0 then
+      for i=1,math.max(#v, #v0) do
+        if v[i] == nil then v[i] = 0 end
+        if v0[i] == nil then v0[i] = 0 end
+      end
+    end
+    r = false
+    for i=1,#v do
+      if v[i] > v0[i] then
+        r = true
+        break
+      elseif v[i] < v0[i] then
+        r = false
+        break
+      end
+    end
+    return r
+  end
+
+  return isNewer(parseVersion(update.version))
 end
 
 -- a navigatable main menu
@@ -197,6 +253,14 @@ function mainMenu(startIndex)
   for i=6,7,1 do
     t.wat("[", 4, i)
     t.wat("]", 6, i)
+  end
+
+  if updateStatus == nil then
+    t.watc("Can't check for updates.", 1, t.sizeY, colors.brown)
+  elseif updateStatus == false then
+    t.watc("No update available.", 1, t.sizeY, colors.green)
+  else
+    t.watc("Update available: "..update.version, 1, t.sizeY, colors.orange)
   end
 
   t.cf(colors.cyan)
@@ -492,8 +556,9 @@ function oreMenu(workingOres, startIndex)
 end
 
 function main()
-  loadCFG()
   welcomeScreen()
+  loadCFG()
+  updateStatus = checkForUpdate()
   mainMenu(1)
   t.c()
 end
