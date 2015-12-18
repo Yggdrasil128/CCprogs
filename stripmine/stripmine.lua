@@ -563,4 +563,33 @@ function main()
   t.c()
 end
 
+osc = {} -- ore search cache
+function checkOre(b, d)
+  if not b then return false end
+  local ore = d.name..":"..tostring(d.metadata)
+  if osc[ore] ~= nil then return osc[ore] end
+  -- cache miss, now do a full cfg search for the ore
+  local snippets = {}
+  snippets[1] = ore
+  for i=#ore,1,-1 do
+    if ore:sub(i,i) == ":" then
+      snippets[#snippets+1] = ore:sub(1,i-1)
+    end
+  end
+  local r = nil;
+  for i=1,#snippets do
+    for j=1,cfg.ores.count do
+      if cfg.ores.names[tostring(j)] == snippets[i] then
+        r = cfg.ores.values[tostring(j)]
+        break
+      end
+    end
+    if r ~= nil then break end
+  end
+  if r == nil then r = false end
+  -- add result to cache and return result
+  osc[ore] = r
+  return r
+end
+
 main()
