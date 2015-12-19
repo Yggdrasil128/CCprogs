@@ -129,7 +129,7 @@ t.watc = function(s,x,y,c) -- write at (color)
   t.wat(s,x,y)
 end
 t.cw = function(s,y) -- center write
-  local x = math.floor( (t.sizeX-#s) / 2)
+  local x = math.ceil( (t.sizeX-#s) / 2)
   t.wat(s,x,y)
 end
 t.cwc = function(s,y,c) -- center write (color)
@@ -335,10 +335,6 @@ function checkForUpdate()
 end
 
 -- a navigatable main menu
---[[
-Settings
-Exit
---]]
 _cfgReturnIndex = 1
 mainOptions = {}
 function mainMenu(startIndex)
@@ -757,6 +753,67 @@ function oreMenu(workingOres, startIndex)
   end
 end
 
+tm = {} -- turtle movement
+tm.move = function()
+  while not turtle.forward() do
+    turtle.dig()
+  end
+end
+tm.left = turtle.turnLeft
+tm.right = turtle.turnRight
+tm.turnAround = function()
+  tm.right()
+  tm.right()
+end
+tm.back = function()
+  if not turtle.back() then
+    tm.turnAround()
+    tm.move()
+    tm.turnAround()
+  end
+end
+tm.up = function()
+  while not turtle.up() do
+    turtle.digUp()
+  end
+end
+tm.down = function()
+  while not turtle.down() do
+    turtle.digDown()
+  end
+end
+tm.moveX = function(x)
+  for i=1,x,1 do
+    tm.move()
+  end
+end
+tm.backX = function(x)
+  tm.turnAround()
+  tm.moveX(x)
+  tm.turnAround()
+end
+
+td = {} -- turtle dig
+td.front = turtle.dig
+td.up = turtle.digUp
+td.down = turtle.digDown
+
+ti = {} -- turtle inspect
+ti.front = turtle.inspect
+ti.up = turtle.inspectUp
+ti.down = turtle.inspectDown
+
+isOre = {}
+isOre.front = function()
+  return checkOre(ti.front())
+end
+isOre.up = function()
+  return checkOre(ti.up())
+end
+isOre.down = function()
+  return checkOre(ti.down())
+end
+
 osc = {} -- ore search cache
 function checkOre(b, d)
   if not b then return false end
@@ -786,6 +843,85 @@ function checkOre(b, d)
   return r
 end
 
+function processVein()
+  if isOre.up() then
+    td.up()
+    tm.up()
+    processVein()
+    tm.down()
+  end
+  if isOre.down() then
+    td.down()
+    tm.down()
+    processVein()
+    tm.up()
+  end
+  if isOre.front() then
+    td.front()
+    tm.move()
+    processVeinIgnoreBack()
+    tm.back()
+  end
+  tm.left() -- left
+  if isOre.front() then
+    td.front()
+    tm.move()
+    processVeinIgnoreBack()
+    tm.back()
+  end
+  tm.left() -- back
+  if isOre.front() then
+    td.front()
+    tm.move()
+    processVeinIgnoreBack()
+    tm.back()
+  end
+  tm.left() -- right
+  if isOre.front() then
+    td.front()
+    tm.move()
+    processVeinIgnoreBack()
+    tm.back()
+  end
+  tm.left() -- front
+end
+
+function processVeinIgnoreBack()
+  if isOre.up() then
+    td.up()
+    tm.up()
+    processVein()
+    tm.down()
+  end
+  if isOre.down() then
+    td.down()
+    tm.down()
+    processVein()
+    tm.up()
+  end
+  if isOre.front() then
+    td.front()
+    tm.move()
+    processVeinIgnoreBack()
+    tm.back()
+  end
+  tm.left()
+  if isOre.front() then
+    td.front()
+    tm.move()
+    processVeinIgnoreBack()
+    tm.back()
+  end
+  tm.turnAround()
+  if isOre.front() then
+    td.front()
+    tm.move()
+    processVeinIgnoreBack()
+    tm.back()
+  end
+  tm.left()
+end
+
 function singleturtle()
   t.m("m",colors.white)
   read()
@@ -806,13 +942,17 @@ function multiturtleHost()
   read()
 end
 
-function main()
-  if not checkCCVersion() then
-    t.errorScreen("CC out of date!", {"ComputerCraft is out of date.", "", "You need at least verion 1.74", "to run CC Stripmine."})
-  end
-  parallel.waitForAll(welcomeScreen, function() updateStatus = checkForUpdate() end)
+function init()
+  updateStatus = checkForUpdate()
   loadCFG()
   setMainOptions()
+end
+
+function main()
+  if not checkCCVersion() then
+    t.errorScreen("CC out of date!", {"ComputerCraft is out of date.", "", "You need at least version 1.74", "to run CC Stripmine."})
+  end
+  parallel.waitForAll(welcomeScreen, init)
   mainMenu(1)
   t.c()
 end
