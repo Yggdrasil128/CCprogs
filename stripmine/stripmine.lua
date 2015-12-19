@@ -1,5 +1,6 @@
 version = "2.0.0 (WIP)"
 
+-- default configuration, do not change
 cfg = {}
 cfg.antiLagSleep = 0
 cfg.fuelCheck = true
@@ -149,14 +150,115 @@ t.m = function(s,c) -- a mark at the right bottom of the screen, for debugging
   t.cp(x0,y0)
   t.cf(cf0)
 end
-
--- displays a simple welcome screen, waiting about 25 ticks
-function welcomeScreen()
-  s1 = "CC Stripmine v"..version
-  s2 = "Copyright (c)  2015"
-  s3 = "by Tim Taubitz (Yggdrasil128)"
+t.errorScreen = function(title, lines)
   t.c()
-  x,y = term.getSize()
+  local sX,sY = term.getSize()
+  local startY = math.ceil((sY-2-#lines)/2)
+  t.cwc(title, startY, colors.red)
+  t.cf(colors.white)
+  for i=1,#lines,1 do
+    t.cw(lines[i],startY+i+1)
+  end
+  t.cp(1,sY)
+  error()
+end
+
+function checkCCVersion()
+  if _CC_VERSION == nil then return false end
+  if tonumber(_CC_VERSION) == nil then return false end
+  return tonumber(_CC_VERSION) >= 1.74
+end
+
+--[[ error codes
+0: all ok
+1: no turtle
+2: inv full
+3: no pickaxe
+--]]
+function checkTurtle()
+  if turtle == nil then return false, 1 end
+
+  local i = 1
+  while i < 17 do
+    if i == 17 then break end
+    if turtle.getItemCount(i) == 0 then break end
+    i = i +1
+  end
+  if i == 17 then return false, 2 end
+  turtle.select(i)
+
+  local checkR = function()
+    turtle.equipRight()
+    local item = turtle.getItemDetail()
+    turtle.equipRight()
+    if item == nil then return false end
+    if item.name ~= "minecraft:diamond_pickaxe" then return false end
+    return true
+  end
+
+  local checkL = function()
+    turtle.equipLeft()
+    local item = turtle.getItemDetail()
+    turtle.equipLeft()
+    if item == nil then return false end
+    if item.name ~= "minecraft:diamond_pickaxe" then return false end
+    return true
+  end
+
+  if peripheral.isPresent("left") then
+    if peripheral.isPresent("right") then
+      return false, 3
+    else
+      if checkR() then
+        return true, 0
+      else
+        return false, 3
+      end
+    end
+  else
+    if checkL() then
+      return true, 0
+    else
+      if peripheral.isPresent("right") then
+        return false, 3
+      else
+        if checkR() then
+          return true, 0
+        else
+          return false, 3
+        end
+      end
+    end
+  end
+end
+
+function checkWireless()
+  local dirs = nil
+
+  if turtle
+  then dirs = {"left","right"}
+  else dirs = {"left","right","top","bottom","front","back"} end
+
+  local r = false
+  for i=1,#dirs do
+    if peripheral.getType(dirs[i]) == "modem" then
+      if peripheral.call(dirs[i],"isWireless") then
+        r = dirs[i]
+        break
+      end
+    end
+  end
+
+  return r
+end
+
+-- displays a simple welcome screen, waiting 25 ticks
+function welcomeScreen()
+  local s1 = "CC Stripmine v"..version
+  local s2 = "Copyright (c)  2015"
+  local s3 = "by Tim Taubitz (Yggdrasil128)"
+  t.c()
+  local x,y = term.getSize()
   t.watc(s1, math.floor((x-#s1)/2), math.floor((y-2)/2), colors.orange)
   t.watc(s2, math.floor((x-#s2)/2), math.floor((y-2)/2)+2, colors.lightGray)
   t.wat(s3, math.floor((x-#s3)/2), math.floor((y-2)/2)+3)
@@ -164,12 +266,12 @@ function welcomeScreen()
   t.cp(1,y)
   if x == 26 then
     for i = 1, x, 1 do
-      term.write(".1", i, y)
+      term.write(".")
       os.sleep(0.05)
     end
   else
     for i = 1, x, 2 do
-      term.write("..", i, y)
+      term.write("..")
       os.sleep(0.05)
     end
   end
@@ -191,7 +293,7 @@ function checkForUpdate()
   if type(update.pastebinID) ~= "string" then return nil end
   if not http.checkURL(pastebinURL..update.pastebinID) then return nil end
 
-  function parseVersion(s)
+  local parseVersion = function(s)
     r = {}
     r[1] = 0
     p = 1
@@ -208,7 +310,7 @@ function checkForUpdate()
     return r
   end
 
-  function isNewer(v)
+  local isNewer = function(v)
     local v0 = parseVersion(version)
     if #v ~= #v0 then
       for i=1,math.max(#v, #v0) do
@@ -238,6 +340,7 @@ Settings
 Exit
 --]]
 _cfgReturnIndex = 1
+mainOptions = {}
 function mainMenu(startIndex)
   t.c()
   t.watc("CC Stripmine v"..version, 1, 1, colors.orange)
@@ -245,14 +348,69 @@ function mainMenu(startIndex)
   t.watc("Main menu", 1, 3, colors.lime)
   t.watc("Scroll with up/down, select with enter", 1, 4, colors.gray)
 
-  t.cf(colors.white)
-  t.wat("[S]ettings...", 4, 6) -- adjust _cfgReturnIndex, too
-  t.wat("[E]xit", 4, 7)
-
-  term.setTextColor(colors.gray)
-  for i=6,7,1 do
-    t.wat("[", 4, i)
-    t.wat("]", 6, i)
+  local y = 6
+  local maxIndex = 0
+  local actionList = {}
+  local actionListRev = {}
+  if mainOptions.mine then
+    t.watc("SingleTurtle: [M]ine", 4, y, colors.white)
+    term.setTextColor(colors.gray)
+    t.wat("[", 18, y)
+    t.wat("]", 20, y)
+    y = y +1
+    maxIndex = maxIndex +1
+    actionList[maxIndex] = "mine"
+    actionListRev["mine"] = maxIndex
+  end
+  if mainOptions.join then
+    t.watc("MultiTurtle:  [J]oin", 4, y, colors.white)
+    term.setTextColor(colors.gray)
+    t.wat("[", 18, y)
+    t.wat("]", 20, y)
+    y = y +1
+    maxIndex = maxIndex +1
+    actionList[maxIndex] = "join"
+    actionListRev["join"] = maxIndex
+  end
+  if mainOptions.rep then
+    t.watc("MultiTurtle:  [R]epeat", 4, y, colors.white)
+    term.setTextColor(colors.gray)
+    t.wat("[", 18, y)
+    t.wat("]", 20, y)
+    y = y +1
+    maxIndex = maxIndex +1
+    actionList[maxIndex] = "repeat"
+    actionListRev["repeat"] = maxIndex
+  end
+  if mainOptions.host then
+    t.watc("MultiTurtle:  [H]ost", 4, y, colors.white)
+    term.setTextColor(colors.gray)
+    t.wat("[", 18, y)
+    t.wat("]", 20, y)
+    y = y +1
+    maxIndex = maxIndex +1
+    actionList[maxIndex] = "host"
+    actionListRev["host"] = maxIndex
+  end
+  do
+    t.watc("[S]ettings...", 4, y, colors.white)
+    term.setTextColor(colors.gray)
+    t.wat("[", 4, y)
+    t.wat("]", 6, y)
+    y = y +1
+    maxIndex = maxIndex +1
+    actionList[maxIndex] = "settings"
+    actionListRev["settings"] = maxIndex
+  end
+  do
+    t.watc("[E]xit", 4, y, colors.white)
+    term.setTextColor(colors.gray)
+    t.wat("[", 4, y)
+    t.wat("]", 6, y)
+    y = y +1
+    maxIndex = maxIndex +1
+    actionList[maxIndex] = "exit"
+    actionListRev["exit"] = maxIndex
   end
 
   if updateStatus == nil then
@@ -264,9 +422,10 @@ function mainMenu(startIndex)
   end
 
   t.cf(colors.cyan)
-  maxIndex = 2
-  index = startIndex
-  fin = false
+  local index = startIndex
+  local fin = false
+  local action = ""
+  local event, key = "", 0
   while not fin do
     t.wat(">", 2, index+5)
     event, key = os.pullEvent("key")
@@ -276,17 +435,59 @@ function mainMenu(startIndex)
     elseif (key == keys.up) and (index>1) then index = index - 1
     elseif (key == keys.down) and (index<maxIndex) then index = index + 1
     elseif key == keys.s then
-      index = 1
+      action = "settings"
       fin = true
     elseif key == keys.e then
-      index = 2
+      action = "exit"
+      fin = true
+    elseif (key == keys.m) and mainOptions.mine then
+      action = "mine"
+      fin = true
+    elseif (key == keys.j) and mainOptions.join then
+      action = "join"
+      fin = true
+    elseif (key == keys.r) and mainOptions.rep then
+      action = "repeat"
+      fin = true
+    elseif (key == keys.h) and mainOptions.host then
+      action = "host"
       fin = true
     end
   end
   os.pullEvent("key_up")
+  if action == "" then action = actionList[index] end
+  index = actionListRev[action]
 
-  if index == 1 then cfgMenu(copyCFG(), 1)
-  elseif index == 2 then return end
+  if action == "settings" then cfgMenu(copyCFG(), 1)
+  elseif action == "exit" then return nil
+  else
+    if action == "mine" then singleturtle()
+    elseif action == "join" then multiturtleJoin()
+    elseif action == "repeat" then multiturtleRepeat()
+    elseif action == "host" then multiturtleHost() end
+    mainMenu(index)
+  end
+end
+
+function setMainOptions()
+  mainOptions.mine = false
+  mainOptions.join = false
+  mainOptions.rep  = false
+  mainOptions.host = false
+
+  if checkWireless() then
+    mainOptions.rep = true
+    mainOptions.host = true
+    _cfgReturnIndex = 3
+    if checkTurtle() then
+      mainOptions.mine = true
+      mainOptions.join = true
+      _cfgReturnIndex = 5
+    end
+  elseif checkTurtle() then
+    mainOptions.mine = true
+    _cfgReturnIndex = 2
+  else _cfgReturnIndex = 1 end
 end
 
 function cfgMenu(workingCFG, startIndex)
@@ -322,9 +523,9 @@ function cfgMenu(workingCFG, startIndex)
   t.wat(workingCFG.endDist, 19, 9)
   t.wat(workingCFG.depth, 19, 10)
 
-  maxIndex = 8
-  index = startIndex
-  function loop()
+  local maxIndex = 8
+  local index = startIndex
+  local loop = function()
     fin = false
     while not fin do
       t.watc(">", 2, index+5, colors.cyan)
@@ -384,7 +585,7 @@ function cfgMenu(workingCFG, startIndex)
       loop()
     elseif index == 6 then
       os.pullEvent("key_up")
-      temp = oreMenu(workingCFG.ores, 1)
+      local temp = oreMenu(workingCFG.ores, 1)
       if temp then workingCFG.ores = temp end
       cfgMenu(workingCFG, 6)
     elseif index == 7 then
@@ -394,6 +595,7 @@ function cfgMenu(workingCFG, startIndex)
       os.pullEvent("key_up")
       cfg = workingCFG
       saveCFG()
+      osc = {}
       mainMenu(_cfgReturnIndex)
     else -- just to be sure...
       index = 1
@@ -555,14 +757,6 @@ function oreMenu(workingOres, startIndex)
   end
 end
 
-function main()
-  welcomeScreen()
-  loadCFG()
-  updateStatus = checkForUpdate()
-  mainMenu(1)
-  t.c()
-end
-
 osc = {} -- ore search cache
 function checkOre(b, d)
   if not b then return false end
@@ -590,6 +784,37 @@ function checkOre(b, d)
   -- add result to cache and return result
   osc[ore] = r
   return r
+end
+
+function singleturtle()
+  t.m("m",colors.white)
+  read()
+end
+
+function multiturtleJoin()
+  t.m("j",colors.white)
+  read()
+end
+
+function multiturtleRepeat()
+  t.m("r",colors.white)
+  read()
+end
+
+function multiturtleHost()
+  t.m("h",colors.white)
+  read()
+end
+
+function main()
+  if not checkCCVersion() then
+    t.errorScreen("CC out of date!", {"ComputerCraft is out of date.", "", "You need at least verion 1.74", "to run CC Stripmine."})
+  end
+  parallel.waitForAll(welcomeScreen, function() updateStatus = checkForUpdate() end)
+  loadCFG()
+  setMainOptions()
+  mainMenu(1)
+  t.c()
 end
 
 main()
