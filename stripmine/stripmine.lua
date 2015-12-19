@@ -113,9 +113,7 @@ t.cat = function(x,y) -- clear (rest of line) at
   t.crol()
   t.cp(x,y)
 end
-t.w = function(s) -- write
-  term.write(s)
-end
+t.w = term.write
 t.wc = function(s,c) -- write (color)
   t.cf(c)
   t.w(s)
@@ -205,30 +203,12 @@ function checkTurtle()
     return true
   end
 
-  if peripheral.isPresent("left") then
-    if peripheral.isPresent("right") then
-      return false, 3
-    else
-      if checkR() then
-        return true, 0
-      else
-        return false, 3
-      end
-    end
+  if checkL() then
+    return true, 0
+  elseif checkR() then
+    return true, 0
   else
-    if checkL() then
-      return true, 0
-    else
-      if peripheral.isPresent("right") then
-        return false, 3
-      else
-        if checkR() then
-          return true, 0
-        else
-          return false, 3
-        end
-      end
-    end
+    return false, 3
   end
 end
 
@@ -521,7 +501,7 @@ function cfgMenu(workingCFG, startIndex)
 
   local maxIndex = 8
   local index = startIndex
-  local loop = function()
+  loop = function()
     fin = false
     while not fin do
       t.watc(">", 2, index+5, colors.cyan)
@@ -922,9 +902,148 @@ function processVeinIgnoreBack()
   tm.left()
 end
 
+function dropInv()
+  tm.right()
+  for i=16,1,-1 do
+    turtle.select(i)
+    if turtle.getItemCount() > 0 then
+      while not turtle.drop() do
+        sleep(1)
+      end
+    end
+  end
+  tm.left()
+end
+
+function refuel(softCap)
+  if turtle.getFuelLevel() >= math.min(turtle.getFuelLimit(), softCap) then return nil end
+  tm.left()
+  while turtle.getFuelLevel() < math.min(turtle.getFuelLimit(), softCap) do
+    turtle.suck(1)
+    turtle.refuel()
+    if turtle.getItemCount() > 0 then
+      tm.turnAround()
+      while not turtle.drop() do
+        sleep(1)
+      end
+      tm.turnAround()
+    end
+  end
+  tm.right()
+end
+
+function singleturtleHome(s, continue)
+  tm.backX(s)
+  dropInv()
+  if cfg.fuelCheck then refuel(cfg.depth*100) end
+  if continue then tm.moveX(s) end
+end
+
+splashes = {} -- some splashes to display during mining
+splashes_delimiter = "#"
+splash = ""
+do
+  local add = function(s)
+    splashes[#splashes+1] = s
+  end
+  --   ....!....1....!....2....!....3....!....4....!....5.
+  --                                         #           #
+  add("Time to mine!")
+  add("Keep calm and mine ores.")
+  add("Never waste your diamonds on a hoe.")
+  add("Diggy, diggy...")
+  add("Creepers gonna creep")
+  add("Oink! ... No.")
+  add("I came, I saw, I mined.")
+  add("In the end,#you know it's all just blocks.")
+  add("Mr. Steve,#pick down this cobblestone!")
+  add("A creeper a day#keeps the diamonds away.")
+  add("I mine, therefore, I craft.")
+  add("Mining is the law of life.")
+  add("Huh? Was that a 'shhhhh' behind you?")
+  add("You will miss 100%#of the ores you don't mine.")
+  add("Keep calm and#HOLY, A CREEPER, DONT KEEP CALM, RUN!")
+  add("Creepers, they just want hugs.")
+  add("In the End, it doesn't even matter.")
+  add("What's redstone again?")
+  add("One step closer to the diamonds...")
+  add("The Dark Mine rises")
+  add("Never dig straight down!")
+  add("Never dig straight up, neither!")
+  add("The thing is,#there's only six sides to a block!")
+  add("Bacon and eggs!")
+  add("Wait a second, creepers are dangerous?!")
+  add("The pick, the ore and the player")
+  add("They see me creepin', they freakin'.")
+  add("They should make a Minecraft movie,#it'll become a blockbuster!")
+  add("One does not simply#stop playing Minecraft.")
+  add("If life gives you lemons,#you must have some sort#of fruit mod installed.")
+  add("Keep calm and craft on.")
+  add("If the Minecraft world is infinite,#then how can the sun rotate around it?")
+  add("Keep calm and sshhhh BOOM!")
+  add("Minecraft won't start? Dinkleberg!")
+end
+
+function getSplash()
+  splash = splashes[math.random(#splashes)]
+  local s,f = 1, nil
+  local parts = {}
+  repeat
+    f = string.find(splash,splashes_delimiter,s)
+    if f == nil then
+      parts[#parts+1] = splash:sub(s)
+    else
+      parts[#parts+1] = splash:sub(s,f-1)
+      s = f+1
+    end
+  until f == nil
+  return parts
+end
+
+function occInvSlots() -- occupied inventory slots
+  local r = 0
+  for i=1,16 do
+    if turtle.getItemCount(i) > 0 then
+      r = r +1
+    end
+  end
+  return r
+end
+
 function singleturtle()
-  t.m("m",colors.white)
-  read()
+  t.c()
+  t.watc("CC Stripmine v"..version, 1, 1, colors.orange)
+  t.wc(" by Yggdrasil128", colors.lightGray)
+  t.watc("Mining strip...", 2, 3, colors.white)
+  dropInv()
+  refuel(cfg.depth*100)
+  for i = 1, cfg.depth do
+    t.watc(tostring(i).." of "..tostring(cfg.depth), 1, 5, colors.green)
+    local s = tostring(math.floor(100*i/cfg.depth)) .. " %"
+    t.watc(s, t.sizeX-#s+1, 5, colors.lime)
+    local b = math.floor(t.sizeX*i/cfg.depth)
+    t.cp(1,6)
+    t.cb(colors.lime)
+    for j=1,b do t.w(" ") end
+    t.cb(colors.black)
+    if (i%5) == 0 or i==1 then
+      local parts = getSplash()
+      t.cf(colors.lightGray)
+      for j=10,13 do
+        t.cat(1,j)
+      end
+      for j=1,#parts do
+        t.wat(parts[j], 1, t.sizeY+j-#parts)
+      end
+    end
+    if (occInvSlots() >= 14) or (turtle.getFuelLevel() < math.min(turtle.getFuelLimit(), cfg.depth*100)) then
+      singleturtleHome(i-1,true)
+    end
+    td.front()
+    tm.move()
+    processVeinIgnoreBack()
+  end
+  singleturtleHome(cfg.depth,false)
 end
 
 function multiturtleJoin()
@@ -943,16 +1062,16 @@ function multiturtleHost()
 end
 
 function init()
-  updateStatus = checkForUpdate()
   loadCFG()
   setMainOptions()
 end
 
 function main()
+  math.randomseed(os.time()*1000)
   if not checkCCVersion() then
     t.errorScreen("CC out of date!", {"ComputerCraft is out of date.", "", "You need at least version 1.74", "to run CC Stripmine."})
   end
-  parallel.waitForAll(welcomeScreen, init)
+  parallel.waitForAll(welcomeScreen, function() updateStatus = checkForUpdate() end, init)
   mainMenu(1)
   t.c()
 end
