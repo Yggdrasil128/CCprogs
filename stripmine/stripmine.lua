@@ -922,7 +922,7 @@ function tweakAddOre()
     read()
   else
     local ore = v.name..":"..tostring(v.metadata)
-    snippets = {}
+    local snippets = {}
     snippets[1] = ore
     for i=#ore,1,-1 do
       if ore:sub(i,i) == ":" then
@@ -939,7 +939,7 @@ function tweakAddOre()
       t.wat("[", 4, i)
       t.wat("]", 6, i)
     end
-    indexM, indexS = 1, 1
+    local indexM, indexS = 1, 1
     local fin, event, key = false, nil, 0
     while not fin do
       t.cat(2, 5)
@@ -964,6 +964,7 @@ function tweakAddOre()
         fin = true
       end
     end
+    os.pullEvent("key_up")
     if indexM == 3 then return nil end
     cfg.ores.count = cfg.ores.count +1
     cfg.ores.names[tostring(cfg.ores.count)] = snippets[indexS]
@@ -975,13 +976,187 @@ function tweakAddOre()
 end
 
 function tweakPingClient()
-  t.m("pingClient",colors.white)
-  read()
+  t.c()
+  t.watc("CC Stripmine v"..version, 1, 1, colors.orange)
+  t.wc(" by Yggdrasil128", colors.lightGray)
+  t.watc("Ping: Client", 2, 3, colors.lime)
+
+  local modems = checkModem(true,true)
+  if modems then
+    for i=1,#modems do
+      rednet.open(modems[i])
+    end
+    t.watc("Scanning for servers...", 2, 5, colors.lightBlue)
+    local serverListRaw = {rednet.lookup("CSMping")}
+    local serverList = {}
+    for i=1,#serverListRaw do
+      if tonumber(serverListRaw[i]) then
+        serverList[#serverList+1] = tonumber(serverListRaw[i])
+      end
+    end
+
+    if #serverList > 0 then
+      t.watc("Select server: ", 2, 5, colors.lightBlue)
+      t.wc("Abort with [A]", colors.lightGray)
+
+      selectServer = function(list, startIndex)
+        if startIndex < 1 then startIndex = 1 end
+        if startIndex > #list then startIndex = #list end
+        local maxLines = t.sizeY-6
+        local pageCount = math.ceil(#list / maxLines)
+        local currentPage = math.ceil(#list / maxLines)
+        local indexDelta = maxLines * (currentPage-1)
+        local linesOnThisPage = 0
+        if currentPage < pageCount then
+          linesOnThisPage = maxLines
+        else
+          linesOnThisPage = #list - maxLines * (pageCount-1)
+        end
+        local indexOnThisPage = (startIndex-1) % maxLines + 1
+
+        t.cf(colors.white)
+        for I=6,5+linesOnThisPage do
+          local i = I+indexDelta-5
+          t.cat(4,I)
+          t.w(tostring(list[i]))
+        end
+
+        term.setTextColor(colors.lightGray)
+        t.cw("Page "..tostring(currentPage).." of "..tostring(pageCount), t.sizeY)
+
+        local fin, event, key = false, nil, 0
+        while not fin do
+          t.watc(">", 2, indexOnThisPage+5, colors.cyan)
+          event, key = os.pullEvent("key")
+          t.wat(" ", 2, indexOnThisPage+5)
+
+          if (key == keys.up) and (indexOnThisPage > 1)
+          then indexOnThisPage = indexOnThisPage -1
+          elseif (key == keys.down) and (indexOnThisPage < linesOnThisPage)
+          then indexOnThisPage = indexOnThisPage +1
+          elseif (key == keys.left) and (currentPage > 1) then fin = true
+          elseif (key == keys.right) and (currentPage < pageCount) then fin = true
+          elseif key == keys.enter then fin = true
+          elseif key == keys.a then fin = true end
+        end
+        os.pullEvent("key_up")
+
+        if key == keys.left then
+          return selectServer(list, indexOnThisPage+indexDelta-maxLines)
+        elseif key == keys.right then
+          return selectServer(list, indexOnThisPage+indexDelta+maxLines)
+        elseif key == keys.enter then
+          return list[indexOnThisPage+indexDelta]
+        elseif key == keys.a then
+          return false
+        else
+          return selectServer(list, indexOnThisPage+indexDelta)
+        end
+      end
+
+      local server = selectServer(serverList,1)
+      if not server then return nil end
+
+      t.c()
+      t.watc("CC Stripmine v"..version, 1, 1, colors.orange)
+      t.wc(" by Yggdrasil128", colors.lightGray)
+      t.watc("Ping: Client", 2, 3, colors.lime)
+      t.watc("Pinging "..tostring(server).."...", 2, 5, colors.lightBlue)
+
+      rednet.send(server, "ping", "CSMping")
+      local p1, p2, p3 = rednet.receive("CSMping",5)
+
+      if p1
+      then t.watc("Pong recieved.", 2, 6, colors.lime)
+      else t.watc("Timeout.", 2, 6, colors.red) end
+
+      t.watc("Press [Enter] to continue...", 2, 8, colors.lightGray)
+      read()
+    else -- no servers
+      t.watc("No servers found.", 2, 7, colors.red)
+      t.watc("Press [Enter] to continue...", 2, 8, colors.lightGray)
+      read()
+    end
+
+    for i=1,#modems do
+      rednet.close(modems[i])
+    end
+  else -- no modem
+    t.watc("No modem connected.", 2, 5, colors.red)
+    t.watc("Press [Enter] to continue...", 2, 6, colors.lightGray)
+    read()
+  end
 end
 
 function tweakPingHost()
-  t.m("pingHost",colors.white)
-  read()
+  t.c()
+  t.watc("CC Stripmine v"..version, 1, 1, colors.orange)
+  t.wc(" by Yggdrasil128", colors.lightGray)
+  t.watc("Ping: Server", 2, 3, colors.lime)
+  t.watc("Modem status:", 2, 5, colors.lightBlue)
+  t.watc("Wired:", 4, 6, colors.white) -- 14
+  t.watc("Offline", 14, 6, colors.red)
+  t.watc("Wireless:", 4, 7, colors.white) -- 14
+  t.watc("Offline", 14, 7, colors.red)
+  t.watc("Server:", 2, 9, colors.lightBlue) -- 18
+  t.watc("Status:", 4, 10, colors.white)
+  t.watc("Offline", 12, 10, colors.red)
+  t.watc("Recieved pings:", 4, 11, colors.white)
+  t.watc("n/a", 20, 11, colors.lightGray)
+  t.watc("Press [Enter] to stop and quit...", 1, 13, colors.lightGray)
+
+  local modems, modems_count = {}, 0
+  modems = checkModem(true,false) -- wired
+  if modems then
+    t.watc("Starting", 14, 6, colors.yellow)
+    for i=1,#modems do
+      rednet.open(modems[i])
+      sleep(0.5)
+    end
+    t.watc("Online  ", 14, 6, colors.lime)
+    modems_count = modems_count + #modems
+  end
+  modems = checkModem(false,true) -- wireless
+  if modems then
+    t.watc("Starting", 14, 7, colors.yellow)
+    for i=1,#modems do
+      rednet.open(modems[i])
+      sleep(0.5)
+    end
+    t.watc("Online  ", 14, 7, colors.lime)
+    modems_count = modems_count + #modems
+  end
+
+  if modems_count > 0 then
+    t.watc("Starting", 12, 10, colors.yellow)
+    rednet.host("CSMping",tostring(os.getComputerID()))
+    sleep(1)
+    t.watc("Online", 12, 10, colors.lime)
+    t.watc(", ID: ", 18, 10, colors.white)
+    t.wc(tostring(os.getComputerID()), colors.cyan)
+
+    t.watc("0  ", 20, 11, colors.green)
+
+    local ping_count = 0
+    local event, p1, p2, p3, p4, p5
+    while true do
+      event, p1, p2, p3, p4, p5 = os.pullEvent()
+
+      if event == "key_up" and p1 == keys.enter then break
+      elseif event == "rednet_message" and p3 == "CSMping" then
+        rednet.send(p1, "pong", "CSMping")
+        ping_count = ping_count +1
+        t.watc(tostring(ping_count), 20, 11, colors.green)
+      end
+    end
+
+    rednet.unhost("CSMping",tostring(os.getComputerID()))
+
+    modems = checkModem(true,true)
+    for i=1,#modems do
+      rednet.close(modems[i])
+    end
+  end
 end
 
 vanilla_ores = {}
