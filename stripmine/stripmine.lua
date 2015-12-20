@@ -212,24 +212,28 @@ function checkTurtle()
   end
 end
 
-function checkWireless()
+function checkModem(wired,wireless)
   local dirs = nil
 
   if turtle
   then dirs = {"left","right"}
   else dirs = {"left","right","top","bottom","front","back"} end
 
-  local r = false
+  local r = {}
   for i=1,#dirs do
     if peripheral.getType(dirs[i]) == "modem" then
-      if peripheral.call(dirs[i],"isWireless") then
-        r = dirs[i]
-        break
+      local isWireless = peripheral.call(dirs[i],"isWireless")
+      if wireless and isWireless then
+        r[#r+1] = dirs[i]
+      elseif wired and not isWireless then
+        r[#r+1] = dirs[i]
       end
     end
   end
 
-  return r
+  if #r > 0
+  then return r
+  else return false end
 end
 
 -- displays a simple welcome screen, waiting 25 ticks
@@ -321,10 +325,9 @@ function mainMenu(startIndex)
   t.c()
   t.watc("CC Stripmine v"..version, 1, 1, colors.orange)
   t.wc(" by Yggdrasil128", colors.lightGray)
-  t.watc("Main menu", 1, 3, colors.lime)
-  t.watc("Scroll with up/down, select with enter", 1, 4, colors.gray)
+  t.watc("Main menu", 2, 3, colors.lime)
 
-  local y = 6
+  local y = 5
   local maxIndex = 0
   local actionList = {}
   local actionListRev = {}
@@ -369,6 +372,16 @@ function mainMenu(startIndex)
     actionListRev["host"] = maxIndex
   end
   do
+    t.watc("[T]weaks...", 4, y, colors.white)
+    term.setTextColor(colors.gray)
+    t.wat("[", 4, y)
+    t.wat("]", 6, y)
+    y = y +1
+    maxIndex = maxIndex +1
+    actionList[maxIndex] = "tweaks"
+    actionListRev["tweaks"] = maxIndex
+  end
+  do
     t.watc("[S]ettings...", 4, y, colors.white)
     term.setTextColor(colors.gray)
     t.wat("[", 4, y)
@@ -403,9 +416,9 @@ function mainMenu(startIndex)
   local action = ""
   local event, key = "", 0
   while not fin do
-    t.wat(">", 2, index+5)
+    t.wat(">", 2, index+4)
     event, key = os.pullEvent("key")
-    t.wat(" ", 2, index+5)
+    t.wat(" ", 2, index+4)
 
     if key == keys.enter then fin = true
     elseif (key == keys.up) and (index>1) then index = index - 1
@@ -415,6 +428,9 @@ function mainMenu(startIndex)
       fin = true
     elseif key == keys.e then
       action = "exit"
+      fin = true
+    elseif key == keys.t then
+      action = "tweaks"
       fin = true
     elseif (key == keys.m) and mainOptions.mine then
       action = "mine"
@@ -437,7 +453,8 @@ function mainMenu(startIndex)
   if action == "settings" then cfgMenu(copyCFG(), 1)
   elseif action == "exit" then return nil
   else
-    if action == "mine" then singleturtle()
+    if action == "tweaks" then tweaksMenu(1)
+    elseif action == "mine" then singleturtle()
     elseif action == "join" then multiturtleJoin()
     elseif action == "repeat" then multiturtleRepeat()
     elseif action == "host" then multiturtleHost() end
@@ -451,62 +468,61 @@ function setMainOptions()
   mainOptions.rep  = false
   mainOptions.host = false
 
-  if checkWireless() then
+  if checkModem(true,true) then
     mainOptions.rep = true
     mainOptions.host = true
-    _cfgReturnIndex = 3
+    _cfgReturnIndex = 4
     if checkTurtle() then
       mainOptions.mine = true
       mainOptions.join = true
-      _cfgReturnIndex = 5
+      _cfgReturnIndex = 6
     end
   elseif checkTurtle() then
     mainOptions.mine = true
-    _cfgReturnIndex = 2
-  else _cfgReturnIndex = 1 end
+    _cfgReturnIndex = 3
+  else _cfgReturnIndex = 2 end
 end
 
 function cfgMenu(workingCFG, startIndex)
   t.c()
   t.watc("CC Stripmine v"..version, 1, 1, colors.orange)
   t.wc(" by Yggdrasil128", colors.lightGray)
-  t.watc("Settings", 1, 3, colors.lime)
-  t.watc("Scroll with up/down, change with enter", 1, 4, colors.gray)
+  t.watc("Settings", 2, 3, colors.lime)
 
   t.cf(colors.white)
-  t.wat("antiLagSleep", 4, 6)
-  t.wat("fuelCheck", 4, 7)
-  t.wat("startDist", 4, 8)
-  t.wat("endDist", 4, 9)
-  t.wat("depth", 4, 10)
-  t.wat("[O]res ...", 4, 11) -- adjust returning index, too
-  t.wat("[A]bort ...", 4, 12)
-  t.wat("[S]ave ...", 4, 13)
+  t.wat("antiLagSleep", 4, 5)
+  t.wat("fuelCheck", 4, 6)
+  t.wat("startDist", 4, 7)
+  t.wat("endDist", 4, 8)
+  t.wat("depth", 4, 9)
+  t.wat("[O]res ...", 4, 10) -- adjust returning index, too
+  t.wat("[A]bort ...", 4, 11)
+  t.wat("[S]ave ...", 4, 12)
 
   term.setTextColor(colors.gray)
-  for i=11,13,1 do
+  for i=10,12,1 do
     t.wat("[", 4, i)
     t.wat("]", 6, i)
   end
 
   t.cf(colors.lightGray)
-  for i=6,10,1 do t.wat("=", 17, i) end
+  for i=5,9,1 do t.wat("=", 17, i) end
 
   t.cf(colors.yellow)
-  t.wat(workingCFG.antiLagSleep, 19, 6)
-  t.wat(workingCFG.fuelCheck and "true" or "false", 19, 7)
-  t.wat(workingCFG.startDist, 19, 8)
-  t.wat(workingCFG.endDist, 19, 9)
-  t.wat(workingCFG.depth, 19, 10)
+  t.wat(workingCFG.antiLagSleep, 19, 5)
+  t.wat(workingCFG.fuelCheck and "true" or "false", 19, 6)
+  t.wat(workingCFG.startDist, 19, 7)
+  t.wat(workingCFG.endDist, 19, 8)
+  t.wat(workingCFG.depth, 19, 9)
 
   local maxIndex = 8
   local index = startIndex
   loop = function()
     fin = false
     while not fin do
-      t.watc(">", 2, index+5, colors.cyan)
+      t.watc(">", 2, index+4, colors.cyan)
       event, key = os.pullEvent("key")
-      t.wat(" ", 2, index+5)
+      t.wat(" ", 2, index+4)
       --
       if key == keys.enter then fin = true
       elseif (key == keys.up) and (index>1) then index = index - 1
@@ -524,39 +540,39 @@ function cfgMenu(workingCFG, startIndex)
     end
 
     if index == 1 then
-      t.cat(19,6)
+      t.cat(19,5)
       t.cf(colors.yellow)
       local v = tonumber(read())
       if v then if v >= 0 then workingCFG.antiLagSleep = v end end
-      t.cat(19,6)
+      t.cat(19,5)
       t.w(workingCFG.antiLagSleep)
       loop()
     elseif index == 2 then
       workingCFG.fuelCheck = not workingCFG.fuelCheck
-      t.watc(workingCFG.fuelCheck and "true " or "false", 19, 7, colors.yellow)
+      t.watc(workingCFG.fuelCheck and "true " or "false", 19, 6, colors.yellow)
       loop()
     elseif index == 3 then
-      t.cat(19,8)
+      t.cat(19,7)
       t.cf(colors.yellow)
       local v = tonumber(read())
       if v then if (v >= 0) and (v <= workingCFG.endDist) then workingCFG.startDist = v end end
-      t.cat(19,8)
+      t.cat(19,7)
       t.w(workingCFG.startDist)
       loop()
     elseif index == 4 then
-      t.cat(19,9)
+      t.cat(19,8)
       t.cf(colors.yellow)
       local v = tonumber(read())
       if v then if v >= workingCFG.startDist then workingCFG.endDist = v end end
-      t.cat(19,9)
+      t.cat(19,8)
       t.w(workingCFG.endDist)
       loop()
     elseif index == 5 then
-      t.cat(19,10)
+      t.cat(19,9)
       t.cf(colors.yellow)
       local v = tonumber(read())
       if v then if v >= 0 then workingCFG.depth = v end end
-      t.cat(19,10)
+      t.cat(19,9)
       t.w(workingCFG.depth)
       loop()
     elseif index == 6 then
@@ -733,55 +749,149 @@ function oreMenu(workingOres, startIndex)
   end
 end
 
+function tweaksMenu(startIndex)
+  t.c()
+  t.watc("CC Stripmine v"..version, 1, 1, colors.orange)
+  t.wc(" by Yggdrasil128", colors.lightGray)
+  t.watc("Tweaks", 2, 3, colors.lime)
+
+  local y = 5
+  local maxIndex = 0
+  local actionList = {}
+  local actionListRev = {}
+  if turtle then
+    t.watc("[A]dd ore to config...", 4, y, colors.white)
+    term.setTextColor(colors.gray)
+    t.wat("[", 4, y)
+    t.wat("]", 6, y)
+    y = y +1
+    maxIndex = maxIndex +1
+    actionList[maxIndex] = "add"
+    actionListRev["add"] = maxIndex
+  end
+  local hasModem = checkModem(true,true)
+  if hasModem then
+    t.watc("Ping: [P]ing", 4, y, colors.white)
+    term.setTextColor(colors.gray)
+    t.wat("[", 10, y)
+    t.wat("]", 12, y)
+    y = y +1
+    maxIndex = maxIndex +1
+    actionList[maxIndex] = "pingp"
+    actionListRev["pingp"] = maxIndex
+
+    t.watc("Ping: [H]ost", 4, y, colors.white)
+    term.setTextColor(colors.gray)
+    t.wat("[", 10, y)
+    t.wat("]", 12, y)
+    y = y +1
+    maxIndex = maxIndex +1
+    actionList[maxIndex] = "pingh"
+    actionListRev["pingh"] = maxIndex
+  end
+  do
+    t.watc("[B]ack to main menu", 4, y, colors.white)
+    term.setTextColor(colors.gray)
+    t.wat("[", 4, y)
+    t.wat("]", 6, y)
+    y = y +1
+    maxIndex = maxIndex +1
+    actionList[maxIndex] = "back"
+    actionListRev["back"] = maxIndex
+  end
+
+  t.cf(colors.cyan)
+  local index = startIndex
+  local fin = false
+  local action = ""
+  local event, key = "", 0
+  while not fin do
+    t.wat(">", 2, index+4)
+    event, key = os.pullEvent("key")
+    t.wat(" ", 2, index+4)
+
+    if key == keys.enter then fin = true
+    elseif (key == keys.up) and (index>1) then index = index - 1
+    elseif (key == keys.down) and (index<maxIndex) then index = index + 1
+    elseif key == keys.b then
+      action = "back"
+      fin = true
+    elseif key == keys.a and turtle then
+      action = "add"
+      fin = true
+    elseif key == keys.p and hasModem then
+      action = "pingp"
+      fin = true
+    elseif key == keys.h and hasModem then
+      action = "pingh"
+      fin = true
+    end
+  end
+  os.pullEvent("key_up")
+  if action == "" then action = actionList[index] end
+  index = actionListRev[action]
+
+  if action == "back" then return nil
+  else
+    if action == "add" then tweakAddOre()
+    elseif action == "pingp" then tweakPingClient()
+    elseif action == "pingh" then tweakPingHost()
+    end
+    tweaksMenu(index)
+  end
+end
+
 tm = {} -- turtle movement
-tm.move = function()
-  while not turtle.forward() do
-    turtle.dig()
-  end
-end
-tm.left = turtle.turnLeft
-tm.right = turtle.turnRight
-tm.turnAround = function()
-  tm.right()
-  tm.right()
-end
-tm.back = function()
-  if not turtle.back() then
-    tm.turnAround()
-    tm.move()
-    tm.turnAround()
-  end
-end
-tm.up = function()
-  while not turtle.up() do
-    turtle.digUp()
-  end
-end
-tm.down = function()
-  while not turtle.down() do
-    turtle.digDown()
-  end
-end
-tm.moveX = function(x)
-  for i=1,x,1 do
-    tm.move()
-  end
-end
-tm.backX = function(x)
-  tm.turnAround()
-  tm.moveX(x)
-  tm.turnAround()
-end
-
 td = {} -- turtle dig
-td.front = turtle.dig
-td.up = turtle.digUp
-td.down = turtle.digDown
-
 ti = {} -- turtle inspect
-ti.front = turtle.inspect
-ti.up = turtle.inspectUp
-ti.down = turtle.inspectDown
+if turtle then
+  tm.move = function()
+    while not turtle.forward() do
+      turtle.dig()
+    end
+  end
+  tm.left = turtle.turnLeft
+  tm.right = turtle.turnRight
+  tm.turnAround = function()
+    tm.right()
+    tm.right()
+  end
+  tm.back = function()
+    if not turtle.back() then
+      tm.turnAround()
+      tm.move()
+      tm.turnAround()
+    end
+  end
+  tm.up = function()
+    while not turtle.up() do
+      turtle.digUp()
+    end
+  end
+  tm.down = function()
+    while not turtle.down() do
+      turtle.digDown()
+    end
+  end
+  tm.moveX = function(x)
+    for i=1,x,1 do
+      tm.move()
+    end
+  end
+  tm.backX = function(x)
+    tm.turnAround()
+    tm.moveX(x)
+    tm.turnAround()
+  end
+
+  td.front = turtle.dig
+  td.up = turtle.digUp
+  td.down = turtle.digDown
+
+  ti.front = turtle.inspect
+  ti.up = turtle.inspectUp
+  ti.down = turtle.inspectDown
+end
 
 isOre = {}
 isOre.front = function()
@@ -794,6 +904,95 @@ isOre.down = function()
   return checkOre(ti.down())
 end
 
+function tweakAddOre()
+  t.c()
+  t.watc("CC Stripmine v"..version, 1, 1, colors.orange)
+  t.wc(" by Yggdrasil128", colors.lightGray)
+  t.watc("Add ore to config", 2, 3, colors.lime)
+
+  local b,v = ti.front()
+
+  if not b then
+    t.watc("No ore found.", 2, 5, colors.yellow)
+    t.watc("This turtle needs to be", 2, 7, colors.white)
+    t.wat("facing an ore directly", 2, 8)
+    t.wat("to add it to the config.", 2, 9)
+    term.setTextColor(colors.lightGray)
+    t.wat("Press [Enter] to continue...", 2, 11)
+    read()
+  else
+    local ore = v.name..":"..tostring(v.metadata)
+    snippets = {}
+    snippets[1] = ore
+    for i=#ore,1,-1 do
+      if ore:sub(i,i) == ":" then
+        snippets[#snippets+1] = ore:sub(1,i-1)
+      end
+    end
+    t.watc("Press [Left]/[Right] to switch rules", 2, 6, colors.lightGray)
+    t.watc("Select a value for this rule:", 2, 8, colors.white)
+    t.watc("[T]rue", 4, 10, colors.lime)
+    t.watc("[F]alse", 4, 11, colors.red)
+    t.watc("[A]bort", 4, 12, colors.brown)
+    t.cf(colors.gray)
+    for i=10,12 do
+      t.wat("[", 4, i)
+      t.wat("]", 6, i)
+    end
+    indexM, indexS = 1, 1
+    local fin, event, key = false, nil, 0
+    while not fin do
+      t.cat(2, 5)
+      t.wc(snippets[indexS], colors.lightBlue)
+      t.watc(">", 2, indexM+9, colors.cyan)
+      event, key = os.pullEvent("key")
+      t.wat(" ", 2, indexM+9)
+
+      if key == keys.up and indexM > 1 then indexM = indexM -1
+      elseif key == keys.down and indexM < 3 then indexM = indexM +1
+      elseif key == keys.left and indexS > 1 then indexS = indexS -1
+      elseif key == keys.right and indexS < #snippets then indexS = indexS +1
+      elseif key == keys.enter then fin = true
+      elseif key == keys.t then
+        indexM = 1
+        fin = true
+      elseif key == keys.f then
+        indexM = 2
+        fin = true
+      elseif key == keys.a then
+        indexM = 3
+        fin = true
+      end
+    end
+    if indexM == 3 then return nil end
+    cfg.ores.count = cfg.ores.count +1
+    cfg.ores.names[tostring(cfg.ores.count)] = snippets[indexS]
+    cfg.ores.values[tostring(cfg.ores.count)] = (indexM == 1)
+    saveCFG()
+    osc = {}
+  end
+  return nil
+end
+
+function tweakPingClient()
+  t.m("pingClient",colors.white)
+  read()
+end
+
+function tweakPingHost()
+  t.m("pingHost",colors.white)
+  read()
+end
+
+vanilla_ores = {}
+vanilla_ores["minecraft:coal_ore"] = true
+vanilla_ores["minecraft:iron_ore"] = true
+vanilla_ores["minecraft:lapis_ore"] = true
+vanilla_ores["minecraft:redstone_ore"] = true
+vanilla_ores["minecraft:gold_ore"] = true
+vanilla_ores["minecraft:diamond_ore"] = true
+vanilla_ores["minecraft:emerald_ore"] = true
+vanilla_ores["minecraft:quartz_ore"] = true
 osc = {} -- ore search cache
 function checkOre(b, d)
   if not b then return false end
@@ -806,6 +1005,9 @@ function checkOre(b, d)
     if ore:sub(i,i) == ":" then
       snippets[#snippets+1] = ore:sub(1,i-1)
     end
+  end
+  if snippets[#snippets] == "minecraft" and not vanilla_ores[snippets[2]] then
+    snippets[#snippets] = nil
   end
   local r = nil;
   for i=1,#snippets do
@@ -969,7 +1171,7 @@ do
   add("One step closer to the diamonds...")
   add("The Dark Mine rises")
   add("Never dig straight down!")
-  add("Never dig straight up, neither!")
+  add("Never dig straight up!")
   add("The thing is,#there's only six sides to a block!")
   add("Bacon and eggs!")
   add("Wait a second, creepers are dangerous?!")
@@ -1020,7 +1222,7 @@ function singleturtle()
   for i = 1, cfg.depth do
     t.watc(tostring(i).." of "..tostring(cfg.depth), 1, 5, colors.green)
     local s = tostring(math.floor(100*i/cfg.depth)) .. " %"
-    t.watc(s, t.sizeX-#s+1, 5, colors.lime)
+    t.watc(s, t.sizeX-#s+1, 5, colors.cyan)
     local b = math.floor(t.sizeX*i/cfg.depth)
     t.cp(1,6)
     t.cb(colors.lime)
@@ -1042,6 +1244,7 @@ function singleturtle()
     td.front()
     tm.move()
     processVeinIgnoreBack()
+    if cfg.antiLagSleep > 0 then os.sleep(cfg.antiLagSleep) end
   end
   singleturtleHome(cfg.depth,false)
 end
