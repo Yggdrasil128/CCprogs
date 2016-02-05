@@ -1,4 +1,26 @@
 version = "2.0.0 (WIP)"
+--[[
+CC Stripmine by Yggdrasil128
+
+See 'https://github.com/Yggdrasil128/CCprogs/tree/master/stripmine'
+for more information
+
+Copyright (C) 2015-2016  Tim Taubitz (aka Yggdrasil128)
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with this program; if not, write to the Free Software Foundation, Inc.,
+51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+]]
 
 -- default configuration, do not change
 cfg = {}
@@ -239,7 +261,7 @@ end
 -- displays a simple welcome screen, waiting 25 ticks
 function welcomeScreen()
   local s1 = "CC Stripmine v"..version
-  local s2 = "Copyright (c)  2015"
+  local s2 = "Copyright (c)  2015 - 2016"
   local s3 = "by Tim Taubitz (Yggdrasil128)"
   t.c()
   local x,y = term.getSize()
@@ -1065,6 +1087,7 @@ function tweakPingClient()
 
       rednet.send(server, "ping", "CSMping")
       local p1, p2, p3 = rednet.receive("CSMping",5)
+      sleep(0.5)
 
       if p1
       then t.watc("Pong recieved.", 2, 6, colors.lime)
@@ -1110,8 +1133,7 @@ function tweakPingHost()
   if modems then
     t.watc("Starting", 14, 6, colors.yellow)
     for i=1,#modems do
-      rednet.open(modems[i])
-      sleep(0.5)
+      parallel.waitForAll(function() rednet.open(modems[i]) end, function() sleep(0.5) end )
     end
     t.watc("Online  ", 14, 6, colors.lime)
     modems_count = modems_count + #modems
@@ -1120,8 +1142,7 @@ function tweakPingHost()
   if modems then
     t.watc("Starting", 14, 7, colors.yellow)
     for i=1,#modems do
-      rednet.open(modems[i])
-      sleep(0.5)
+      parallel.waitForAll(function() rednet.open(modems[i]) end, function() sleep(0.5) end )
     end
     t.watc("Online  ", 14, 7, colors.lime)
     modems_count = modems_count + #modems
@@ -1129,8 +1150,7 @@ function tweakPingHost()
 
   if modems_count > 0 then
     t.watc("Starting", 12, 10, colors.yellow)
-    rednet.host("CSMping",tostring(os.getComputerID()))
-    sleep(1)
+    parallel.waitForAll(function() rednet.host("CSMping",tostring(os.getComputerID())) end, function() sleep(0.5) end )
     t.watc("Online", 12, 10, colors.lime)
     t.watc(", ID: ", 18, 10, colors.white)
     t.wc(tostring(os.getComputerID()), colors.cyan)
