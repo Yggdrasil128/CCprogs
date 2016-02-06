@@ -1090,7 +1090,7 @@ function tweakPingClient()
       sleep(0.5)
 
       if p1
-      then t.watc("Pong recieved.", 2, 6, colors.lime)
+      then t.watc("Pong received.", 2, 6, colors.lime)
       else t.watc("Timeout.", 2, 6, colors.red) end
 
       t.watc("Press [Enter] to continue...", 2, 8, colors.lightGray)
@@ -1124,7 +1124,7 @@ function tweakPingHost()
   t.watc("Server:", 2, 9, colors.lightBlue) -- 18
   t.watc("Status:", 4, 10, colors.white)
   t.watc("Offline", 12, 10, colors.red)
-  t.watc("Recieved pings:", 4, 11, colors.white)
+  t.watc("Received pings:", 4, 11, colors.white)
   t.watc("n/a", 20, 11, colors.lightGray)
   t.watc("Press [Enter] to stop and quit...", 1, 13, colors.lightGray)
 
@@ -1444,34 +1444,767 @@ function singleturtle()
   singleturtleHome(cfg.depth,false)
 end
 
+--[[
+prototype for a csmnet message:
+table  msg
+number msg.sender
+number msg.seqNo
+number msg.receiver
+any    msg.data
+]]
+csmnet = {}
+csmnet.thisClient = os.getComputerID()
+csmnet.host = 0
+csmnet.turtles = {} -- only for the host
+csmnet.repeater = {}
+csmnet.msgSeqNo = 0
+csmnet.msgSeqs = {}
+csmnet.init = function(host)
+  csmnet.host = host
+  csmnet.turtles = {}
+  csmnet.repeater = {}
+  csmnet.msgSeqNo = 0
+  csmnet.msgSeqs = {}
+end
+csmnet.addTurtle = function(id)
+  local found = 0
+  for i=1, #csmnet.turtles do
+    if csmnet.turtles[i].name == id and csmnet.turtles[i].connected then
+      found = i
+      break
+    end
+  end
+  if found == 0 then
+    local t = {}
+    t.name = id
+    t.connected = true
+    csmnet.turtles[#csmnet.turtles+1] = t
+    csmnet.msgSeqs[id] = 0
+    found = #csmnet.turtles
+  end
+  return found
+end
+csmnet.addRepeater = function(id)
+  local found = 0
+  for i=1, #csmnet.repeater do
+    if csmnet.repeater[i].name == id and csmnet.repeater[i].connected then
+      found = i
+      break
+    end
+  end
+  if found == 0 then
+    local t = {}
+    t.name = id
+    t.connected = true
+    csmnet.repeater[#csmnet.repeater+1] = t
+    csmnet.msgSeqs[id] = 0
+    found = #csmnet.repeater
+  end
+  return found
+end
+csmnet.removeTurtleByID = function(id)
+  for i=1, #csmnet.turtles do
+    if csmnet.turtles[i].name == id and csmnet.turtles[i].connected then
+      csmnet.turtles[i].connected = false
+      break
+    end
+  end
+  csmnet.msgSeqs[id] = nil
+end
+csmnet.removeRepeaterByID = function(id)
+  for i=1, #csmnet.repeater do
+    if csmnet.repeater[i].name == id and csmnet.repeater[i].connected then
+      csmnet.repeater[i].connected = false
+      break
+    end
+  end
+  csmnet.msgSeqs[id] = nil
+end
+csmnet.removeTurtleByNO = function(no)
+  csmnet.turtles[no].connected = false
+  csmnet.msgSeqs[csmnet.turtles[no].name] = nil
+end
+csmnet.removeRepeaterByNO = function(no)
+  csmnet.repeater[no].connected = false
+  csmnet.msgSeqs[csmnet.repeater[no].name] = nil
+end
+csmnet.isTurtle = function(id)
+  local r = false
+  for i=1, #csmnet.turtles do
+    if csmnet.turtles[i].name == id and csmnet.turtles[i].connected then
+      r = true
+      break
+    end
+  end
+  return r
+end
+csmnet.isRepeater = function(id)
+  local r = false
+  for i=1, #csmnet.repeater do
+    if csmnet.repeater[i].name == id and csmnet.repeater[i].connected then
+      r = true
+      break
+    end
+  end
+  return r
+end
+csmnet.isValidMsg = function(msg)
+  if  type(msg) == "table"
+  and type(msg.sender) == "number"
+  and type(msg.seqNo) == "number"
+  and type(msg.receiver) == "number"
+  then return true
+  else return false end
+end
+csmnet.isNewMsg = function(msg)
+  if msg.sender == csmnet.thisClient then return false end
+  if csmnet.msgSeqs[msg.sender] == nil then
+    csmnet.msgSeqs[msg.sender] = msg.seqNo
+    return true
+  end
+  if csmnet.msgSeqs[msg.sender] < msg.seqNo then
+    csmnet.msgSeqs[msg.sender] = msg.seqNo
+    return true
+  end
+  return false
+end
+csmnet.send = function(rec, data)
+  csmnet.msgSeqNo = csmnet.msgSeqNo +1
+  -- craft the message
+  msg = {}
+  msg.sender = csmnet.thisClient
+  msg.seqNo = csmnet.msgSeqNo
+  msg.receiver = tonumber(rec)
+  msg.data = data
+  -- send msg to rec
+  rednet.send(rec, msg, "CSMnet")
+  -- send msg to all rep
+  for i=1, #csmnet.repeater do
+    if csmnet.repeater[i].connected then
+      rednet.send(csmnet.repeater[i].name, msg, "CSMnet")
+    end
+  end
+end
+-- #############################################################################################################################################################
 function multiturtleJoin()
-  t.m("j",colors.white)
-  read()
-end
+  t.c()
+  t.watc("CC Stripmine v"..version, 1, 1, colors.orange)
+  t.wc(" by Yggdrasil128", colors.lightGray)
+  t.watc("MultiTurtle: Join", 2, 3, colors.lime)
 
+  local modems = checkModem(true,true)
+  for i=1,#modems do
+    rednet.open(modems[i])
+  end
+  t.watc("Scanning for hosts...", 2, 5, colors.lightBlue)
+  local serverListRaw = {rednet.lookup("CSMhost")}
+  local serverList = {}
+  for i=1,#serverListRaw do
+    if tonumber(serverListRaw[i]) then
+      serverList[#serverList+1] = tonumber(serverListRaw[i])
+    end
+  end
+
+  local repeaterListRaw = {rednet.lookup("CSMrepeat")}
+  for i=1,#repeaterListRaw do
+    if tonumber(repeaterListRaw[i]) then
+      serverList[#serverList+1] = tonumber(repeaterListRaw[i])
+    end
+  end
+
+  --[[
+  network info table (nit) structure:
+  table    nit
+  number   nit.host
+  [number] nit.repeater
+  ]]
+  hosts = {}
+  repeater = {}
+  local hasHost = function(s)
+    local r = false
+    for j=1, #hosts do
+      if s == hosts[j] then
+        r = true
+        break
+      end
+    end
+    return r
+  end
+  for i=1, #serverList do
+    rednet.send(serverList[i], "info", "CSMinfo")
+    local _, nit, __ = rednet.receive("CSMinfo", 5)
+    if type(nit) == "table" and not hasHost(nit.host) then
+      hosts[#hosts+1] = nit.host
+      repeater[nit.host] = nit.repeater
+    end
+  end
+
+  if #hosts == 0 then
+    t.watc("No hosts found.", 2, 7, colors.red)
+    t.watc("Press [Enter] to continue...", 2, 8, colors.lightGray)
+    read()
+    return nil
+  end
+  t.watc("Select host: ", 2, 5, colors.lightBlue)
+  t.wc("Abort with [A]", colors.lightGray)
+  selectServer = function(list, startIndex)
+    if startIndex < 1 then startIndex = 1 end
+    if startIndex > #list then startIndex = #list end
+    local maxLines = t.sizeY-6
+    local pageCount = math.ceil(#list / maxLines)
+    local currentPage = math.ceil(#list / maxLines)
+    local indexDelta = maxLines * (currentPage-1)
+    local linesOnThisPage = 0
+    if currentPage < pageCount then
+      linesOnThisPage = maxLines
+    else
+      linesOnThisPage = #list - maxLines * (pageCount-1)
+    end
+    local indexOnThisPage = (startIndex-1) % maxLines + 1
+      t.cf(colors.white)
+    for I=6,5+linesOnThisPage do
+      local i = I+indexDelta-5
+      t.cat(4,I)
+      t.w(tostring(list[i]))
+    end
+    term.setTextColor(colors.lightGray)
+    t.cw("Page "..tostring(currentPage).." of "..tostring(pageCount), t.sizeY)
+    local fin, event, key = false, nil, 0
+    while not fin do
+      t.watc(">", 2, indexOnThisPage+5, colors.cyan)
+      event, key = os.pullEvent("key")
+      t.wat(" ", 2, indexOnThisPage+5)
+
+      if (key == keys.up) and (indexOnThisPage > 1)
+      then indexOnThisPage = indexOnThisPage -1
+      elseif (key == keys.down) and (indexOnThisPage < linesOnThisPage)
+      then indexOnThisPage = indexOnThisPage +1
+      elseif (key == keys.left) and (currentPage > 1) then fin = true
+      elseif (key == keys.right) and (currentPage < pageCount) then fin = true
+      elseif key == keys.enter then fin = true
+      elseif key == keys.a then fin = true end
+    end
+    os.pullEvent("key_up")
+
+    if key == keys.left then
+      return selectServer(list, indexOnThisPage+indexDelta-maxLines)
+    elseif key == keys.right then
+      return selectServer(list, indexOnThisPage+indexDelta+maxLines)
+    elseif key == keys.enter then
+      return list[indexOnThisPage+indexDelta]
+    elseif key == keys.a then
+      return false
+    else
+      return selectServer(list, indexOnThisPage+indexDelta)
+    end
+  end
+
+  local host = selectServer(hosts,1)
+  if not host then return nil end
+
+  t.c()
+  t.watc("CC Stripmine v"..version, 1, 1, colors.orange)
+  t.wc(" by Yggdrasil128", colors.lightGray)
+  t.watc("MultiTurtle: Join", 2, 3, colors.lime)
+
+  t.watc("Connecting to host "..tostring(host).."...", 1, 5, colors.lightGray)
+  sleep(1)
+
+  -- try to connect to the network
+  local connected = false
+  -- try connecting directly to the host
+  rednet.send(host, "join", "CSMhost")
+  local _, turtleID, __ = rednet.receive("CSMhost", 2)
+  if type(turtleID) == "number" then
+    connected = true
+  else
+    -- try connecting to one of the repeater
+    for i=1, #repeater[host] do
+      local rep = repeater[host][i]
+      rednet.send(rep, "join", "CSMrepeat")
+      _, turtleID, __ = rednet.receive("CSMrepeat", 2)
+      if type(turtleID) == "number" then
+        connected = true
+        break
+      end
+    end
+  end
+  if not connected then
+    t.watc("Unable to connect.", 1, 6, colors.red)
+    t.watc("Press [Enter] to continue...", 1, 7, colors.cyan)
+    read()
+    return nil
+  end
+
+  csmnet.init(host)
+  for i=1, #repeater[host] do
+    csmnet.addRepeater(repeater[host][i])
+  end
+
+  local announceSeqNo = 0
+
+  t.watc("Connected.", 1, 6, colors.green)
+  t.watc("Assigned turtle ID is "..tostring(turtleID)..".", 1, 7, colors.green)
+  t.watc("Press [D] at any time to disconnect.", 1, 8, colors.cyan)
+  t.watc("Waiting for network...", 1, 9, colors.lightGray)
+
+  local fin = false
+  repeat
+    local e, p1, p2, p3, p4, p5 = os.pullEvent()
+
+    if e == "key_up" and p1 == keys.d then -- disconnect
+      turtleID = nil
+      csmnet.send(csmnet.host, "unjoin")
+      fin = true
+    elseif e == "rednet_message" then
+      if p3 == "CSMannounce" and type(p2) == "table" and p2.seqNo > announceSeqNo then
+        announceSeqNo = p2.seqNo
+        if p2.type == "repeat" then
+          csmnet.addRepeater(p2.value)
+        elseif p2.type == "unrepeat" then
+          csmnet.removeRepeaterByID(p2.value)
+        end
+      end
+    end
+  until fin
+  if not turtleID then return nil end
+
+  for i=1,#modems do
+    rednet.close(modems[i])
+  end
+end
+-- #############################################################################################################################################################
 function multiturtleRepeat()
-  t.m("r",colors.white)
-  read()
-end
+  t.c()
+  t.watc("CC Stripmine v"..version, 1, 1, colors.orange)
+  t.wc(" by Yggdrasil128", colors.lightGray)
+  t.watc("MultiTurtle: Repeat", 2, 3, colors.lime)
 
+  local modems = checkModem(true,true)
+  for i=1,#modems do
+    rednet.open(modems[i])
+  end
+  t.watc("Scanning for hosts...", 2, 5, colors.lightBlue)
+  local serverListRaw = {rednet.lookup("CSMhost")}
+  local serverList = {}
+  for i=1,#serverListRaw do
+    if tonumber(serverListRaw[i]) then
+      serverList[#serverList+1] = tonumber(serverListRaw[i])
+    end
+  end
+
+  local repeaterListRaw = {rednet.lookup("CSMrepeat")}
+  for i=1,#repeaterListRaw do
+    if tonumber(repeaterListRaw[i]) then
+      serverList[#serverList+1] = tonumber(repeaterListRaw[i])
+    end
+  end
+
+  --[[
+  network info table (nit) structure:
+  table    nit
+  number   nit.host
+  [number] nit.repeater
+  ]]
+  hosts = {}
+  repeater = {}
+  local hasHost = function(s)
+    local r = false
+    for j=1, #hosts do
+      if s == hosts[j] then
+        r = true
+        break
+      end
+    end
+    return r
+  end
+  for i=1, #serverList do
+    rednet.send(serverList[i], "info", "CSMinfo")
+    local _, nit, __ = rednet.receive("CSMinfo", 5)
+    if type(nit) == "table" and not hasHost(nit.host) then
+      hosts[#hosts+1] = nit.host
+      repeater[nit.host] = nit.repeater
+    end
+  end
+
+  if #hosts == 0 then
+    t.watc("No hosts found.", 2, 7, colors.red)
+    t.watc("Press [Enter] to continue...", 2, 8, colors.lightGray)
+    read()
+    return nil
+  end
+  t.watc("Select host: ", 2, 5, colors.lightBlue)
+  t.wc("Abort with [A]", colors.lightGray)
+  selectServer = function(list, startIndex)
+    if startIndex < 1 then startIndex = 1 end
+    if startIndex > #list then startIndex = #list end
+    local maxLines = t.sizeY-6
+    local pageCount = math.ceil(#list / maxLines)
+    local currentPage = math.ceil(#list / maxLines)
+    local indexDelta = maxLines * (currentPage-1)
+    local linesOnThisPage = 0
+    if currentPage < pageCount then
+      linesOnThisPage = maxLines
+    else
+      linesOnThisPage = #list - maxLines * (pageCount-1)
+    end
+    local indexOnThisPage = (startIndex-1) % maxLines + 1
+      t.cf(colors.white)
+    for I=6,5+linesOnThisPage do
+      local i = I+indexDelta-5
+      t.cat(4,I)
+      t.w(tostring(list[i]))
+    end
+    term.setTextColor(colors.lightGray)
+    t.cw("Page "..tostring(currentPage).." of "..tostring(pageCount), t.sizeY)
+    local fin, event, key = false, nil, 0
+    while not fin do
+      t.watc(">", 2, indexOnThisPage+5, colors.cyan)
+      event, key = os.pullEvent("key")
+      t.wat(" ", 2, indexOnThisPage+5)
+
+      if (key == keys.up) and (indexOnThisPage > 1)
+      then indexOnThisPage = indexOnThisPage -1
+      elseif (key == keys.down) and (indexOnThisPage < linesOnThisPage)
+      then indexOnThisPage = indexOnThisPage +1
+      elseif (key == keys.left) and (currentPage > 1) then fin = true
+      elseif (key == keys.right) and (currentPage < pageCount) then fin = true
+      elseif key == keys.enter then fin = true
+      elseif key == keys.a then fin = true end
+    end
+    os.pullEvent("key_up")
+
+    if key == keys.left then
+      return selectServer(list, indexOnThisPage+indexDelta-maxLines)
+    elseif key == keys.right then
+      return selectServer(list, indexOnThisPage+indexDelta+maxLines)
+    elseif key == keys.enter then
+      return list[indexOnThisPage+indexDelta]
+    elseif key == keys.a then
+      return false
+    else
+      return selectServer(list, indexOnThisPage+indexDelta)
+    end
+  end
+
+  local host = selectServer(hosts,1)
+  if not host then return nil end
+
+  t.c()
+  t.watc("CC Stripmine v"..version, 1, 1, colors.orange)
+  t.wc(" by Yggdrasil128", colors.lightGray)
+  t.watc("MultiTurtle: Repeat", 2, 3, colors.lime)
+
+  t.watc("Connecting to host "..tostring(host).."...", 1, 5, colors.lightGray)
+  sleep(1)
+
+  -- try to connect to the network
+  local connected = false
+  -- try connecting directly to the host
+  rednet.send(host, "repeat", "CSMhost")
+  local _, repeaterID, __ = rednet.receive("CSMhost", 2)
+  if type(repeaterID) == "number" then
+    connected = true
+  else
+    -- try connecting to one of the repeater
+    for i=1, #repeater[host] do
+      local rep = repeater[host][i]
+      rednet.send(rep, "repeat", "CSMrepeat")
+      _, repeaterID, __ = rednet.receive("CSMrepeat", 2)
+      if type(repeaterID) == "number" then
+        connected = true
+        break
+      end
+    end
+  end
+  if not connected then
+    t.watc("Unable to connect.", 1, 6, colors.red)
+    t.watc("Press [Enter] to continue...", 1, 7, colors.cyan)
+    read()
+    return nil
+  end
+
+  csmnet.init(host)
+  for i=1, #repeater[host] do
+    csmnet.addRepeater(repeater[host][i])
+  end
+
+  rednet.host("CSMrepeat", tostring(csmnet.thisClient))
+
+  t.watc("Connected.", 1, 6, colors.green)
+  t.watc("Assigned repeater ID is "..tostring(repeaterID)..".", 1, 7, colors.green)
+  t.watc("Press [D] at any time to disconnect,", 1, 8, colors.cyan)
+  t.watc("but this may causes your network", 1, 9, colors.cyan)
+  t.watc("to stop working.", 1, 10, colors.cyan)
+  t.watc("Repeating network messages...", 1, 11, colors.white)
+  t.watc("Message count:", 1, 12, colors.lightGray)
+
+  msgCount = 0
+  updateStatusScreen = function()
+    t.watc(tostring(msgCount), 16, 12, colors.white)
+  end
+  local incMsgCount = function()
+    msgCount = msgCount +1
+    updateStatusScreen()
+  end
+  updateStatusScreen()
+
+  local announceSeqNo = 0
+
+  local networkOpen = true
+
+  local fin = false
+  repeat
+    local e, p1, p2, p3, p4, p5 = os.pullEvent()
+
+    if e == "key_up" and p1 == keys.d then -- disconnect
+      repeaterID = nil
+      csmnet.send(csmnet.host, "unrepeat")
+      fin = true
+    elseif e == "rednet_message" then
+      if p3 == "CSMinfo" then
+        local nit = {}
+        nit.host = csmnet.host
+        nit.repeater = {}
+        nit.repeater[1] = csmnet.thisClient
+        for i=1, #csmnet.repeater do
+          if csmnet.repeater[i].connected then
+            nit.repeater[#nit.repeater+1] = csmnet.repeater[i].name
+          end
+        end
+        rednet.send(p1, nit, "CSMinfo")
+        incMsgCount()
+      elseif p3 == "CSMannounce" and type(p2) == "table" and p2.seqNo > announceSeqNo then
+        announceSeqNo = p2.seqNo
+        rednet.broadcast(p2, "CSMannounce")
+        incMsgCount()
+        if p2.type == "repeat" then
+          csmnet.addRepeater(p2.value)
+        elseif p2.type == "unrepeat" then
+          csmnet.removeRepeaterByID(p2.value)
+        elseif p2.type == "close" then
+          networkOpen = false
+          rednet.unhost("CSMrepeat", tostring(csmnet.thisClient))
+        end
+      elseif p3 == "CSMrepeat" and networkOpen then
+        if p2 == "join" then -- new turtle
+          local client = p1
+          local msg = {}
+          msg.text = "join"
+          msg.value = client
+          csmnet.send(csmnet.host, msg)
+          local _, reply, __
+          repeat
+            _, reply, __ = rednet.receive("CSMnet", 2)
+          until reply == nil or (csmnet.isValidMsg(reply) and csmnet.isNewMsg(reply) and reply.receiver == csmnet.thisClient)
+          incMsgCount()
+          if type(reply) == "table" and type(reply.data) == "number" then
+            rednet.send(client, reply.data, "CSMrepeat")
+            incMsgCount()
+          end
+        elseif p2 == "repeat" then -- new repeater
+          local client = p1
+          local msg = {}
+          msg.text = "repeat"
+          msg.value = client
+          csmnet.send(csmnet.host, msg)
+          local _, reply, __
+          repeat
+            _, reply, __ = rednet.receive("CSMnet", 2)
+          until reply == nil or (csmnet.isValidMsg(reply) and csmnet.isNewMsg(reply) and reply.receiver == csmnet.thisClient)
+          incMsgCount()
+          if type(reply) == "table" and type(reply.data) == "number" then
+            rednet.send(client, reply.data, "CSMrepeat")
+            incMsgCount()
+          end
+        end
+      elseif p3 == "CSMnet" and csmnet.isValidMsg(p2) and csmnet.isNewMsg(p2) then
+        rednet.send(p2.receiver, p2, "CSMnet")
+        for i=1, #csmnet.repeater do
+          if csmnet.repeater[i].connected then
+            rednet.send(csmnet.repeater[i].name, p2, "CSMnet")
+          end
+        end
+        incMsgCount()
+      end
+    end
+  until fin
+  if networkOpen then
+    rednet.host("CSMrepeat", tostring(csmnet.thisClient))
+    networkOpen = false
+  end
+  if not repeaterID then return nil end
+
+  for i=1,#modems do
+    rednet.close(modems[i])
+  end
+end
+-- #############################################################################################################################################################
 function multiturtleHost()
-  t.m("h",colors.white)
-  read()
-end
+  t.c()
+  t.watc("CC Stripmine v"..version, 1, 1, colors.orange)
+  t.wc(" by Yggdrasil128", colors.lightGray)
+  t.watc("MultiTurtle: Host", 2, 3, colors.lime)
+  sleep(1)
 
+  t.watc("Preparing MultiTurtle network host...", 1, 5, colors.lightGray)
+  sleep(1)
+
+  csmnet.init(csmnet.thisClient)
+  announceSeqNo = 0
+
+  t.watc("Opening modems...", 1, 6, colors.lightGray)
+  local modems, modems_count = {}, 0
+  modems = checkModem(true,true) -- both wiredand wireless
+  for i=1,#modems do
+      parallel.waitForAll(function() rednet.open(modems[i]) end, function() sleep(0.5) end )
+  end
+
+  t.watc("Registering and opening host service...", 1, 7, colors.lightGray)
+  parallel.waitForAll(function() rednet.host("CSMhost",tostring(os.getComputerID())) end, function() sleep(2) end )
+
+  t.watc("Ready. ", 1, 8, colors.green)
+  t.wc("Hostname: "..tostring(os.getComputerID()), colors.lime)
+  t.watc("Waiting for incoming connections...", 1, 9, colors.white)
+  t.watc("Status: ", 1, 10, colors.orange)
+  t.wc("Turtles: ", colors.lightGray)
+  t.wc("0   ", colors.white) -- x=18
+  t.wc("Repeater: ", colors.lightGray)
+  t.wc("0  ", colors.white)  -- x=32
+  t.watc("Press [Enter] once finished.", 1, 11, colors.cyan)
+
+  local updateStatusScreen = function()
+    local n = 0
+    for i=1, #csmnet.turtles do
+      if csmnet.turtles[i].connected then
+        n = n +1
+      end
+    end
+    t.watc(tostring(n), 18, 10, colors.white)
+    while term.getCursorPos() < 21 do
+      t.w(" ")
+    end
+    n = 0
+    for i=1, #csmnet.repeater do
+      if csmnet.repeater[i].connected then
+        n = n +1
+      end
+    end
+    t.watc(tostring(n), 32, 10, colors.white)
+    while term.getCursorPos() < 35 do
+      t.w(" ")
+    end
+  end
+
+  local fin = false
+  repeat
+    local e, p1, p2, p3, p4, p5 = os.pullEvent()
+
+    if e == "key_up" and p1 == keys.enter then fin = true
+    elseif e == "rednet_message" then
+      if p2 == "info" and p3 == "CSMinfo" then
+        local nit = {}
+        nit.host = csmnet.host
+        nit.repeater = {}
+        for i=1, #csmnet.repeater do
+          if csmnet.repeater[i].connected then
+            nit.repeater[#nit.repeater+1] = csmnet.repeater[i].name
+          end
+        end
+        rednet.send(p1, nit, "CSMinfo")
+      elseif p2 == "join" and p3 == "CSMhost" then
+        local seqNo = csmnet.addTurtle(p1)
+        rednet.send(p1, seqNo, "CSMhost")
+        updateStatusScreen()
+      elseif p2 == "repeat" and p3 == "CSMhost" then
+        -- announce the new repeater to the network
+        announceSeqNo = announceSeqNo +1
+        local amsg = {}
+        amsg.type = "repeat"
+        amsg.value = p1
+        amsg.seqNo = announceSeqNo
+        rednet.broadcast(amsg, "CSMannounce")
+        -- accept the new repeater
+        local seqNo = csmnet.addRepeater(p1)
+        rednet.send(p1, seqNo, "CSMhost")
+        updateStatusScreen()
+      elseif p3 == "CSMnet" and csmnet.isValidMsg(p2) and csmnet.isNewMsg(p2) then
+        if p2.data == "unjoin" and csmnet.isTurtle(p2.sender) then
+          csmnet.removeTurtleByID(p2.sender)
+          updateStatusScreen()
+        elseif p2.data == "unrepeat" and csmnet.isRepeater(p2.sender) then
+          csmnet.removeRepeaterByID(p2.sender)
+          -- announce the disconnecting repeater to the network
+          announceSeqNo = announceSeqNo +1
+          local amsg = {}
+          amsg.type = "unrepeat"
+          amsg.value = p2.sender
+          amsg.seqNo = announceSeqNo
+          rednet.broadcast(amsg, "CSMannounce")
+          updateStatusScreen()
+        elseif type(p2.data) == "table" and p2.data.text == "join" then
+          local seqNo = csmnet.addTurtle(p2.data.value)
+          csmnet.send(p2.sender, seqNo)
+          updateStatusScreen()
+        elseif type(p2.data) == "table" and p2.data.text == "repeat" then
+          -- accept the new repeater
+          local seqNo = csmnet.addRepeater(p2.data.value)
+          csmnet.send(p2.sender, seqNo)
+          -- announce the new repeater to the network
+          sleep(0.1)
+          announceSeqNo = announceSeqNo +1
+          local amsg = {}
+          amsg.type = "repeat"
+          amsg.value = p2.data.value
+          amsg.seqNo = announceSeqNo
+          rednet.broadcast(amsg, "CSMannounce")
+          updateStatusScreen()
+        end
+      end
+    end
+  until fin
+
+  t.watc("Closing host service...", 1, 12, colors.lightGray)
+  parallel.waitForAll(function() rednet.unhost("CSMhost",tostring(os.getComputerID())) end, function() sleep(1) end )
+  announceSeqNo = announceSeqNo +1
+  local amsg = {}
+  amsg.type = "close"
+  amsg.seqNo = announceSeqNo
+  rednet.broadcast(amsg, "CSMannounce")
+
+  t.watc("Network established and ready.", 1, 13, colors.green)
+  sleep(2)
+
+  read()
+  for i=1,#modems do
+    rednet.close(modems[i])
+  end
+end
+-- #############################################################################################################################################################
 function init()
+  math.randomseed(os.time()*1000)
   loadCFG()
   setMainOptions()
 end
 
+function exit()
+  t.c()
+  local x,y = term.getSize()
+  x = math.ceil(x/2 -4)
+  y = math.ceil(y/2)
+  t.cp(x,y)
+  textutils.slowPrint("Goodbye.",10)
+  sleep(0.2)
+  t.c()
+end
+
 function main()
-  math.randomseed(os.time()*1000)
   if not checkCCVersion() then
     t.errorScreen("CC out of date!", {"ComputerCraft is out of date.", "", "You need at least version 1.74", "to run CC Stripmine."})
   end
   parallel.waitForAll(welcomeScreen, function() updateStatus = checkForUpdate() end, init)
   mainMenu(1)
-  t.c()
+  exit()
 end
 
 main()
